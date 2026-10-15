@@ -1,0 +1,314 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Spend Plan Prototype</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap">
+<style>
+/* Layout: one narrow column like a phone app — today's limit, add spending, where the money goes, history, setup. */
+:root{
+  --bg:#eef1f5; --surface:#ffffff; --ink:#152033; --muted:#5b6678; --line:#d5dbe4;
+  --accent:#2f4fd8; --accent-soft:#e3e8fc;
+  --ok:#1d7a4f; --ok-soft:#dff3e8; --warn:#9a5b00; --warn-soft:#fbeed6; --bad:#b3261e; --bad-soft:#fbe3e1;
+  --reserve:#7a8aa6;
+  --f-display:"Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --f-body:"IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --f-num:"IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0f141c; --surface:#171e2a; --ink:#e7ecf4; --muted:#9aa5b8; --line:#2a3445;
+  --accent:#8ea2ff; --accent-soft:#222c4d;
+  --ok:#5fd19b; --ok-soft:#173326; --warn:#f0b65a; --warn-soft:#3a2a10; --bad:#ff8a80; --bad-soft:#3d1a18;
+  --reserve:#5d6b84; color-scheme:dark;}}
+:root[data-theme="dark"]{
+  --bg:#0f141c; --surface:#171e2a; --ink:#e7ecf4; --muted:#9aa5b8; --line:#2a3445;
+  --accent:#8ea2ff; --accent-soft:#222c4d;
+  --ok:#5fd19b; --ok-soft:#173326; --warn:#f0b65a; --warn-soft:#3a2a10; --bad:#ff8a80; --bad-soft:#3d1a18;
+  --reserve:#5d6b84; color-scheme:dark;}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.5}
+.wrap{max-width:1140px;margin:0 auto;padding-inline:16px;padding-block:24px 48px;display:grid;gap:16px}
+@media (min-width:700px){.wrap{padding-inline:32px;padding-block:36px 64px}}
+.layout{display:grid;gap:16px;grid-template-columns:1fr}
+.col{display:grid;gap:16px;align-content:start;min-width:0}
+@media (min-width:900px){
+  .layout{grid-template-columns:minmax(0,1fr) minmax(0,1.15fr);gap:20px}
+  .col{gap:20px}
+  .card{padding:24px}
+  .hero .big{font-size:4.6rem}
+  .tablewrap{max-height:420px;overflow-y:auto}
+}
+.title{font-family:var(--f-display);font-weight:800;font-size:clamp(1.4rem,3vw,2rem);margin:2px 0 0;line-height:1.1}
+header{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:end;gap:8px}
+.tag{font-family:var(--f-num);font-size:12px;color:var(--muted);letter-spacing:.04em}
+h2{font-family:var(--f-display);font-weight:600;font-size:1.1rem;margin:0}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:18px;display:grid;gap:12px;min-width:0}
+.num{font-family:var(--f-num);font-variant-numeric:tabular-nums}
+.muted{color:var(--muted)} .small{font-size:13px}
+.hero{gap:6px}
+.hero .label{font-size:13px;color:var(--muted)}
+.hero .big{font-family:var(--f-display);font-weight:800;font-size:clamp(2.6rem,12vw,3.6rem);line-height:1}
+.hero .sub{color:var(--muted);font-size:14px}
+.stats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px 16px;padding-bottom:14px;border-bottom:1px solid var(--line)}
+@media (min-width:480px){.stats{grid-template-columns:repeat(4,minmax(0,1fr))}}
+.stat{display:grid;gap:2px;min-width:0}
+.stat .k{font-size:12px;color:var(--muted);letter-spacing:.03em}
+.stat .v{font-family:var(--f-num);font-variant-numeric:tabular-nums;font-size:1.15rem}
+.stat .d{font-size:12px;color:var(--muted)}
+.next{background:var(--accent-soft);border-radius:8px;padding:10px 12px;font-size:14px;margin-top:8px}
+.next b{color:var(--accent)}
+.next.alert{background:var(--bad-soft)} .next.alert b{color:var(--bad)}
+.pace{display:grid;gap:6px;margin-top:6px}
+.pace-row{display:grid;grid-template-columns:100px 1fr 44px;align-items:center;gap:10px;font-size:13px}
+.track{height:8px;background:var(--line);border-radius:4px;overflow:hidden}
+.fill{height:100%;background:var(--accent)} .fill.time{background:var(--muted)} .fill.over{background:var(--bad)}
+label{display:grid;gap:4px;font-size:13px;color:var(--muted)}
+input,select{font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:9px 10px;width:100%;min-width:0}
+input:focus-visible,select:focus-visible,button:focus-visible,summary:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.addrow{display:grid;grid-template-columns:110px 1fr;gap:10px}
+.addrow .wide{grid-column:1/-1}
+button{font:inherit;font-weight:600;border:0;border-radius:8px;padding:10px 14px;cursor:pointer;background:var(--accent);color:var(--surface)}
+button:disabled{opacity:.45;cursor:not-allowed}
+button.ghost{background:transparent;color:var(--accent);border:1px solid var(--line)}
+button.tiny{padding:4px 8px;font-size:12px;font-weight:500}
+.preview{display:grid;grid-template-columns:auto 1fr;gap:4px 10px;align-items:center;border-radius:8px;padding:10px 12px;border:1px solid var(--line)}
+.preview .pill{justify-self:start}
+.preview .txt{font-size:14px}
+.pill{font-size:12px;font-weight:600;padding:2px 9px;border-radius:999px;white-space:nowrap}
+.pill.ok{background:var(--ok-soft);color:var(--ok)} .pill.fit{background:var(--accent-soft);color:var(--accent)}
+.pill.warn{background:var(--warn-soft);color:var(--warn)} .pill.bad{background:var(--bad-soft);color:var(--bad)}
+.split{display:flex;height:26px;border-radius:6px;overflow:hidden;background:var(--line)}
+.split div{display:flex;align-items:center;padding-inline:8px;font-family:var(--f-num);font-size:12px;color:#fff;white-space:nowrap;overflow:hidden;min-width:0}
+.split .r{background:var(--reserve)} .split .f{background:var(--accent)}
+.kv{display:grid;grid-template-columns:1fr auto;gap:5px 12px;font-size:14px}
+.kv .total{border-top:1px solid var(--line);padding-top:6px;font-weight:600}
+.tablewrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:14px}
+td{padding:7px 4px;border-bottom:1px solid var(--line)}
+td.r{text-align:right}
+details summary{cursor:pointer;font-family:var(--f-display);font-weight:600;font-size:1.05rem}
+.bill-row{display:grid;grid-template-columns:1fr 100px auto;gap:8px;align-items:center}
+@media (prefers-reduced-motion:no-preference){.fill,.split div{transition:width .3s ease}}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <div><span class="tag">DSAI1202 · PROTOTYPE v0.3</span><h1 class="title">Here is how to finish the month.</h1></div>
+    <button class="ghost tiny" id="resetBtn" type="button">Reset to example</button>
+  </header>
+
+  <div class="layout">
+  <div class="col">
+  <!-- 1. TODAY -->
+  <section class="card hero" aria-label="Today">
+    <div class="stats" id="stats"></div>
+    <div class="label" style="margin-top:10px">You can spend per day</div>
+    <div class="big num" id="daily">$0</div>
+    <div class="sub" id="dailySub"></div>
+    <div class="pace">
+      <div class="pace-row"><span>Budget used</span><div class="track"><div class="fill" id="usedBar"></div></div><span class="num" id="usedPct"></span></div>
+      <div class="pace-row"><span>Month passed</span><div class="track"><div class="fill time" id="timeBar"></div></div><span class="num" id="timePct"></span></div>
+    </div>
+    <div class="next" id="nextAction"></div>
+  </section>
+
+  <!-- 2. ADD / CAN I AFFORD -->
+  <section class="card" aria-labelledby="addH">
+    <h2 id="addH">Add spending</h2>
+    <form id="addForm" class="addrow">
+      <label>Amount $<input id="amt" type="number" min="0.01" step="0.01" inputmode="decimal" placeholder="0"></label>
+      <label>What for<input id="desc" type="text" placeholder="e.g. Lunch, new jacket"></label>
+      <label class="wide">Category<select id="cat"></select></label>
+      <div class="preview wide" id="preview"><span class="pill fit">Tip</span><span class="txt">Type an amount to see how it changes your daily limit before you add it.</span></div>
+      <button type="submit" class="wide" id="addBtn" disabled>Add</button>
+    </form>
+  </section>
+  </div>
+
+  <div class="col">
+  <!-- 3. WHERE THE MONEY GOES -->
+  <section class="card" aria-labelledby="planH">
+    <h2 id="planH">Rest of the month</h2>
+    <div class="split" aria-hidden="true"><div class="r" id="splitR"></div><div class="f" id="splitF"></div></div>
+    <div class="kv" id="planKv"></div>
+  </section>
+
+  <!-- 4. HISTORY -->
+  <section class="card" aria-labelledby="logH">
+    <h2 id="logH">This month's spending</h2>
+    <div class="tablewrap"><table><tbody id="logBody"></tbody></table></div>
+  </section>
+  </div>
+  </div>
+
+  <!-- 5. SETUP -->
+  <section class="card">
+    <details>
+      <summary>Setup: budget and bills</summary>
+      <div style="display:grid;gap:14px;margin-top:12px">
+        <label>Monthly budget $<input id="sBudget" type="number" min="0" step="1"></label>
+        <div style="display:grid;gap:8px">
+          <div class="small muted">Bills: fixed monthly costs the app sets aside before working out your daily limit.</div>
+          <div id="billList" style="display:grid;gap:8px"></div>
+          <div><button class="ghost tiny" type="button" id="addBill">+ Add bill</button></div>
+        </div>
+      </div>
+    </details>
+  </section>
+</div>
+
+<script>
+const KEY="spendplan.v2";
+const DAILY_CATS=["Food","Fun","Clothes","Other"];
+
+/* Today, from the calendar. The budget month is the current calendar month. */
+const NOW=new Date();
+const Y=NOW.getFullYear(), M=NOW.getMonth();
+const TODAY=NOW.getDate();
+const DAYS=new Date(Y,M+1,0).getDate();
+const MONTH_KEY=`${Y}-${String(M+1).padStart(2,"0")}`;
+const dateOf=d=>`${MONTH_KEY}-${String(d).padStart(2,"0")}`;
+
+function example(){
+  const d=n=>dateOf(Math.max(1,Math.min(TODAY,n)));
+  return {budget:3000,
+    bills:[{name:"Rent",monthly:1200},{name:"Transport",monthly:310},{name:"Phone & internet",monthly:185}],
+    log:[
+      {date:d(1),desc:"Hall fee",cat:"Rent",amt:1200},
+      {date:d(2),desc:"Groceries",cat:"Food",amt:95},
+      {date:d(3),desc:"Octopus top-up",cat:"Transport",amt:80},
+      {date:d(5),desc:"Concert ticket",cat:"Fun",amt:180},
+      {date:d(7),desc:"Groceries",cat:"Food",amt:110},
+      {date:d(8),desc:"Dinner with friends",cat:"Food",amt:125},
+      {date:d(9),desc:"Octopus top-up",cat:"Transport",amt:75},
+      {date:d(10),desc:"Canteen meals",cat:"Food",amt:55},
+      {date:d(11),desc:"Game sale",cat:"Fun",amt:80}
+    ]};
+}
+let S;
+function load(){try{const r=localStorage.getItem(KEY);if(r){S=JSON.parse(r);return}}catch(e){}S=example()}
+function save(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
+const $=id=>document.getElementById(id);
+const money=n=>(n<0?"−$":"$")+Math.abs(Math.round(n)).toLocaleString("en-US");
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const monthLog=()=>S.log.filter(e=>e.date.startsWith(MONTH_KEY));
+
+/* ---- The core calculation. The team must understand and check this. ----
+   remaining  = budget - everything spent this month
+   billsLeft  = for each bill: monthly amount - already paid (never below 0)
+   forDaily   = remaining - billsLeft      (food, fun, clothes, everything else)
+   daysLeft   = days left in the month, counting today
+   daily      = forDaily / daysLeft                                          */
+function compute(log=monthLog()){
+  const spent=log.reduce((a,e)=>a+e.amt,0);
+  const remaining=S.budget-spent;
+  const daysLeft=DAYS-TODAY+1;
+  const bills=S.bills.map(b=>{const paid=log.filter(x=>x.cat===b.name).reduce((a,x)=>a+x.amt,0);return {...b,paid,left:Math.max(0,b.monthly-paid)}});
+  const billsLeft=bills.reduce((a,b)=>a+b.left,0);
+  const forDaily=remaining-billsLeft;
+  return {spent,remaining,daysLeft,bills,billsLeft,forDaily,daily:forDaily/daysLeft,
+    usedShare:S.budget?spent/S.budget:0,timeShare:TODAY/DAYS};
+}
+
+/* ---- Verdict for a spending before it is added. ----
+   Placeholder rules (team decision):
+   - within today's daily limit                  -> "Fine"
+   - over it, but daily limit stays >= 70%       -> "OK"
+   - daily limit drops below 70% of what it was  -> "Think twice"
+   - more than the money left for daily spending -> "Can't afford"   */
+const KEEP_SHARE=0.7;
+function judge(amt,cat){
+  const before=compute();
+  const after=compute([...monthLog(),{date:dateOf(TODAY),desc:"",cat,amt}]);
+  const bill=before.bills.find(b=>b.name===cat);
+  if(bill&&amt<=bill.left) return {cls:"ok",label:"Fine",txt:`Paid from the ${money(bill.left)} set aside for ${esc(cat)}. Daily limit stays ${money(before.daily)}.`};
+  if(after.forDaily<0) return {cls:"bad",label:"Can't afford",txt:`You'd be ${money(-after.forDaily)} short for your bills this month.`};
+  if(amt<=before.daily) return {cls:"ok",label:"Fine",txt:`Within today's limit. Daily limit becomes ${money(after.daily)}.`};
+  if(after.daily>=before.daily*KEEP_SHARE) return {cls:"fit",label:"OK",txt:`Daily limit drops from ${money(before.daily)} to ${money(after.daily)} for ${before.daysLeft} days.`};
+  return {cls:"warn",label:"Think twice",txt:`Daily limit drops from ${money(before.daily)} to ${money(after.daily)} for ${before.daysLeft} days.`};
+}
+
+function render(){
+  const c=compute();
+  const mon=NOW.toLocaleString("en-US",{month:"short"});
+  $("stats").innerHTML=
+    `<div class="stat"><span class="k">Budget</span><span class="v">${money(S.budget)}</span><span class="d">${mon} 1 – ${mon} ${DAYS} · ${DAYS} days</span></div>`+
+    `<div class="stat"><span class="k">Spent</span><span class="v">${money(c.spent)}</span><span class="d">in ${TODAY} day${TODAY>1?"s":""}</span></div>`+
+    `<div class="stat"><span class="k">Left</span><span class="v">${money(c.remaining)}</span><span class="d">incl. ${money(c.billsLeft)} bills</span></div>`+
+    `<div class="stat"><span class="k">To go</span><span class="v">${c.daysLeft} days</span><span class="d">incl. today</span></div>`;
+  $("daily").textContent=money(Math.max(0,c.daily));
+  $("dailySub").textContent=`for food and everything else · ${c.daysLeft} days left in ${NOW.toLocaleString("en-US",{month:"long"})}`;
+  const up=Math.round(c.usedShare*100),tp=Math.round(c.timeShare*100);
+  $("usedBar").style.width=Math.min(100,up)+"%";$("usedBar").classList.toggle("over",up>tp+5);
+  $("usedPct").textContent=up+"%";$("timeBar").style.width=tp+"%";$("timePct").textContent=tp+"%";
+
+  const nx=$("nextAction");nx.classList.toggle("alert",c.forDaily<0);
+  if(c.forDaily<0) nx.innerHTML=`<b>Your bills are at risk.</b> You are ${money(-c.forDaily)} short. Stop non-essential spending until the month ends.`;
+  else if(up>tp+5) nx.innerHTML=`You've used <b>${up}% of your budget in ${tp}% of the month</b>. Stay under <b>${money(c.daily)}/day</b> and you'll still cover your bills.`;
+  else nx.innerHTML=`You're on track. Stay under <b>${money(c.daily)}/day</b> and you'll finish the month with money for every bill.`;
+
+  const tot=Math.max(1,c.billsLeft+Math.max(0,c.forDaily));
+  $("splitR").style.width=c.billsLeft/tot*100+"%";$("splitR").textContent="Bills "+money(c.billsLeft);
+  $("splitF").style.width=Math.max(0,c.forDaily)/tot*100+"%";$("splitF").textContent="Daily "+money(Math.max(0,c.forDaily));
+  $("planKv").innerHTML=`<span>Left this month</span><span class="num">${money(c.remaining)}</span>`+
+    c.bills.filter(b=>b.left>0).map(b=>`<span class="muted">− ${esc(b.name)} still to pay</span><span class="num muted">${money(b.left)}</span>`).join("")+
+    `<span class="total">For daily spending</span><span class="num total">${money(c.forDaily)}</span>`;
+
+  const cur=$("cat").value;
+  const cats=[...DAILY_CATS,...S.bills.map(b=>b.name)];
+  $("cat").innerHTML=`<optgroup label="Daily spending">${DAILY_CATS.map(x=>`<option${x===cur?" selected":""}>${x}</option>`).join("")}</optgroup>`+
+    (S.bills.length?`<optgroup label="Bills">${S.bills.map(b=>`<option${b.name===cur?" selected":""}>${esc(b.name)}</option>`).join("")}</optgroup>`:"");
+  if(!cats.includes(cur))$("cat").value="Food";
+  renderPreview();
+
+  const rows=monthLog().map((e,i)=>({e,i:S.log.indexOf(e)})).sort((a,b)=>b.e.date.localeCompare(a.e.date));
+  $("logBody").innerHTML=rows.map(({e,i})=>`<tr><td class="num muted">${+e.date.slice(8)}</td><td>${esc(e.desc)}<div class="small muted">${esc(e.cat)}</div></td><td class="r num">${money(e.amt)}</td><td class="r"><button class="ghost tiny" type="button" data-del="${i}" aria-label="Delete">✕</button></td></tr>`).join("")||`<tr><td class="muted">Nothing added this month yet.</td></tr>`;
+
+  $("sBudget").value=S.budget;
+  $("billList").innerHTML=S.bills.map((b,i)=>`<div class="bill-row"><input aria-label="Bill name" data-bn="${i}" value="${esc(b.name)}"><input aria-label="Monthly amount" type="number" min="0" step="1" data-bm="${i}" value="${b.monthly}"><button class="ghost tiny" type="button" data-bd="${i}" aria-label="Remove bill">✕</button></div>`).join("");
+}
+
+function renderPreview(){
+  const amt=+$("amt").value;
+  $("addBtn").disabled=!(amt>0);
+  if(!(amt>0)){$("preview").innerHTML=`<span class="pill fit">Tip</span><span class="txt">Type an amount to see how it changes your daily limit before you add it.</span>`;return}
+  const v=judge(amt,$("cat").value);
+  $("preview").innerHTML=`<span class="pill ${v.cls}">${v.label}</span><span class="txt">${v.txt}</span>`;
+}
+
+function keepFocus(fn){const a=document.activeElement,ds=a?{...a.dataset}:{},id=a&&a.id;fn();
+  if(id&&$(id))$(id).focus();else{const k=Object.keys(ds)[0];if(k){const el=document.querySelector(`[data-${k}="${ds[k]}"]`);if(el)el.focus()}}}
+
+document.addEventListener("input",ev=>{
+  const t=ev.target,n=v=>Math.max(0,+v||0);
+  if(t.id==="amt"||t.id==="cat"){renderPreview();return}
+  if(t.id==="sBudget")S.budget=n(t.value);
+  else if(t.dataset.bm!==undefined)S.bills[+t.dataset.bm].monthly=n(t.value);
+  else if(t.dataset.bn!==undefined){const i=+t.dataset.bn,old=S.bills[i].name;S.bills[i].name=t.value;S.log.forEach(e=>{if(e.cat===old)e.cat=t.value})}
+  else return;
+  save();keepFocus(render);
+});
+$("cat").addEventListener("change",renderPreview);
+document.addEventListener("click",ev=>{
+  const t=ev.target.closest("button");if(!t)return;
+  if(t.dataset.del!==undefined){S.log.splice(+t.dataset.del,1)}
+  else if(t.dataset.bd!==undefined){S.bills.splice(+t.dataset.bd,1)}
+  else if(t.id==="addBill"){S.bills.push({name:"New bill",monthly:0})}
+  else if(t.id==="resetBtn"){S=example()}
+  else return;
+  save();render();
+});
+$("addForm").addEventListener("submit",ev=>{ev.preventDefault();
+  const amt=+$("amt").value;if(!(amt>0))return;
+  S.log.push({date:dateOf(TODAY),desc:$("desc").value.trim()||$("cat").value,cat:$("cat").value,amt});
+  $("amt").value="";$("desc").value="";save();render();});
+load();render();
+</script>
+</body>
+</html>

@@ -93,14 +93,22 @@ td.r{text-align:right}
 details summary{cursor:pointer;font-family:var(--f-display);font-weight:600;font-size:1.05rem}
 .bill-row{display:grid;grid-template-columns:1fr 100px auto;gap:8px;align-items:center}
 @media (prefers-reduced-motion:no-preference){.fill,.split div{transition:width .3s ease}}
+.btn-row{display:flex;gap:8px;flex-wrap:wrap}
+.chart-wrap{overflow-x:auto}
+.chart-wrap svg{display:block;width:100%;height:auto}
 </style>
 </head>
 <body>
 
 <div class="wrap">
   <header>
-    <div><span class="tag">DSAI1202 · PROTOTYPE v0.3</span><h1 class="title">Here is how to finish the month.</h1></div>
-    <button class="ghost tiny" id="resetBtn" type="button">Reset to example</button>
+    <div><span class="tag">DSAI1202 · PROTOTYPE v0.5</span><h1 class="title">Here is how to finish the month.</h1></div>
+    <div class="btn-row">
+      <button class="ghost tiny" id="exportBtn" type="button">Export CSV</button>
+      <button class="ghost tiny" id="importBtn" type="button">Import CSV</button>
+      <button class="ghost tiny" id="resetBtn" type="button">Reset to example</button>
+      <input type="file" id="csvFile" accept=".csv" hidden>
+    </div>
   </header>
 
   <div class="layout">
@@ -142,6 +150,7 @@ details summary{cursor:pointer;font-family:var(--f-display);font-weight:600;font
   <!-- 4. HISTORY -->
   <section class="card" aria-labelledby="logH">
     <h2 id="logH">This month's spending</h2>
+    <div class="chart-wrap" id="chartWrap"></div>
     <div class="tablewrap"><table><tbody id="logBody"></tbody></table></div>
   </section>
   </div>
@@ -272,6 +281,7 @@ function render(){
 
   $("sBudget").value=S.budget;
   $("billList").innerHTML=S.bills.map((b,i)=>`<div class="bill-row"><input aria-label="Bill name" data-bn="${i}" value="${esc(b.name)}"><input aria-label="Monthly amount" type="number" min="0" step="1" data-bm="${i}" value="${b.monthly}"><button class="ghost tiny" type="button" data-bd="${i}" aria-label="Remove bill">✕</button></div>`).join("");
+  renderChart();
 }
 
 function renderPreview(){
@@ -308,6 +318,121 @@ $("addForm").addEventListener("submit",ev=>{ev.preventDefault();
   const amt=+$("amt").value;if(!(amt>0))return;
   S.log.push({date:dateOf(TODAY),desc:$("desc").value.trim()||$("cat").value,cat:$("cat").value,amt});
   $("amt").value="";$("desc").value="";save();render();});
+
+/* ---- Daily spending chart (SVG) ---- */
+function renderChart(){
+  const billNames=new Set(S.bills.map(b=>b.name));
+  const dailyLog=monthLog().filter(e=>!billNames.has(e.cat));
+  const perDay=new Array(TODAY).fill(0);
+  dailyLog.forEach(e=>{const d=+e.date.slice(8);if(d>=1&&d<=TODAY)perDay[d-1]+=e.amt});
+  const c=compute();
+  const limit=Math.max(0,c.daily);
+  const maxVal=Math.max(limit,...perDay,1);
+  const W=Math.max(320,TODAY*28),H=120,pad=28,bot=18;
+  const plotH=H-pad-bot;
+  const barW=Math.max(4,Math.min(18,(W-40)/TODAY-2));
+  const step=(W-40)/TODAY;
+  const xs=i=>20+step*i+step/2;
+  const yOf=v=>pad+plotH-plotH*(v/maxVal);
+  const style=getComputedStyle(document.documentElement);
+  const accent=style.getPropertyValue("--accent").trim();
+  const muted=style.getPropertyValue("--muted").trim();
+  const line=style.getPropertyValue("--line").trim();
+  const warn=style.getPropertyValue("--warn").trim();
+  let svg=`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" role="img" aria-label="Daily spending chart">`;
+  // grid lines
+  const steps=[0,.25,.5,.75,1];
+  steps.forEach(s=>{
+    const y=yOf(maxVal*s);
+    svg+=`<line x1="20" y1="${y}" x2="${W-20}" y2="${y}" stroke="${line}" stroke-width="0.5"/>`;
+  });
+  // daily limit line
+  if(limit>0){
+    const ly=yOf(limit);
+    svg+=`<line x1="20" y1="${ly}" x2="${W-20}" y2="${ly}" stroke="${warn}" stroke-width="1.5" stroke-dasharray="5,3"/>`;
+    svg+=`<text x="${W-18}" y="${ly-4}" fill="${warn}" font-size="10" font-family="var(--f-num)" text-anchor="end">${money(limit)}/day</text>`;
+  }
+  // bars
+  perDay.forEach((v,i)=>{
+    if(v===0)return;
+    const x=xs(i)-barW/2,y=yOf(v),h=yOf(0)-y;
+    const col=v>limit&&limit>0?warn:accent;
+    svg+=`<rect x="${x}" y="${y}" width="${barW}" height="${h}" rx="2" fill="${col}" opacity="0.85"/>`;
+  });
+  // day labels (show every Nth to avoid clutter)
+  const labelEvery=TODAY<=15?1:TODAY<=22?2:3;
+  for(let i=0;i<TODAY;i++){
+    if((i+1)%labelEvery===0||i===0){
+      svg+=`<text x="${xs(i)}" y="${H-4}" fill="${muted}" font-size="10" font-family="var(--f-num)" text-anchor="middle">${i+1}</text>`;
+    }
+  }
+  svg+=`</svg>`;
+  $("chartWrap").innerHTML=svg;
+}
+
+/* ---- CSV Export ---- */
+function exportCSV(){
+  const log=monthLog().slice().sort((a,b)=>a.date.localeCompare(b.date));
+  const lines=[];
+  lines.push("# Budget: "+S.budget);
+  S.bills.forEach(b=>lines.push("# Bill: "+b.name+", "+b.monthly));
+  lines.push("date,description,category,amount");
+  log.forEach(e=>{
+    const desc=e.desc.includes(",")?'"'+e.desc.replace(/"/g,'""')+'"':e.desc;
+    const cat=e.cat.includes(",")?'"'+e.cat.replace(/"/g,'""')+'"':e.cat;
+    lines.push(e.date+","+desc+","+cat+","+e.amt);
+  });
+  const blob=new Blob([lines.join("\n")],{type:"text/csv"});
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(blob);
+  a.download="spend-plan-"+MONTH_KEY+".csv";
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+/* ---- CSV Import ---- */
+function importCSV(text){
+  const lines=text.split(/\r?\n/).filter(l=>l.trim());
+  let budget=S.budget;
+  const bills=[];
+  const log=[];
+  for(const raw of lines){
+    if(raw.startsWith("# Budget: ")){budget=+raw.slice(10)||budget;continue}
+    if(raw.startsWith("# Bill: ")){
+      const parts=raw.slice(8);
+      const lastComma=parts.lastIndexOf(",");
+      if(lastComma>0){bills.push({name:parts.slice(0,lastComma).trim(),monthly:+parts.slice(lastComma+1).trim()||0})}
+      continue;
+    }
+    if(raw.toLowerCase().startsWith("date,"))continue;
+    // parse CSV row (handle quoted fields)
+    const fields=[];let cur="",inQ=false;
+    for(let i=0;i<raw.length;i++){
+      const ch=raw[i];
+      if(inQ){if(ch==='"'&&raw[i+1]==='"'){cur+='"';i++}else if(ch==='"')inQ=false;else cur+=ch}
+      else{if(ch==='"')inQ=true;else if(ch===","){fields.push(cur);cur=""}else cur+=ch}
+    }
+    fields.push(cur);
+    if(fields.length>=4){
+      const amt=+fields[3];
+      if(amt>0)log.push({date:fields[0],desc:fields[1],cat:fields[2],amt});
+    }
+  }
+  S.budget=budget;
+  if(bills.length)S.bills=bills;
+  // merge: replace entries for months in the import, keep others
+  const importMonths=new Set(log.map(e=>e.date.slice(0,7)));
+  S.log=S.log.filter(e=>!importMonths.has(e.date.slice(0,7))).concat(log);
+  save();render();
+}
+
+$("exportBtn").addEventListener("click",exportCSV);
+$("importBtn").addEventListener("click",()=>$("csvFile").click());
+$("csvFile").addEventListener("change",ev=>{
+  const f=ev.target.files[0];if(!f)return;
+  f.text().then(t=>{importCSV(t);ev.target.value=""});
+});
+
 load();render();
 </script>
 </body>

@@ -39,6 +39,7 @@ daily      = forDaily / daysLeft
 | v0.2 | Food moved into the daily limit; "Can I afford this?" and the spending log merged into one box; settings reduced to budget and bills; date taken from the calendar. | The AI version was confusing: food is a daily expense, and checking a purchase and logging it are the same action. |
 | v0.3 | Two-column layout for laptops. | The phone-first layout felt cramped on a laptop. |
 | v0.4 | Budget, spent, left and days-to-go shown at the top. | It was not visible how much budget there was and how long it had to last. |
+| v0.5 | Export/Import CSV; daily spending bar chart (SVG, no libraries). | Need to share data between devices and see spending patterns at a glance. |
 
 ## Use of AI
 

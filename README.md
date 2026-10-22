@@ -17,7 +17,7 @@ Most budgeting apps only tell you that you are overspending. This prototype tell
 
 Open `index.html` in a browser. No install or account is needed. Data is saved only in your own browser (localStorage).
 
-Live version: *(GitHub Pages link, to be added)*
+Live version: https://st2r930.github.io/dsai1202-spend-plan/
 
 ## How the numbers are calculated
 

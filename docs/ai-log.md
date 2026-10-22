@@ -33,3 +33,10 @@ Lesson: *(to fill — e.g. AI followed our slides literally; it did not think ab
 Asked AI to: make the layout better for a laptop, and show the budget and how long it must last.
 AI did: two-column layout (v0.3), then a summary row with budget, spent, left and days to go (v0.4).
 Lesson: *(to fill)*
+
+## 2026-10-22 · St2r930 · Claude Code
+Asked AI to: create the GitHub repo, enable Pages, add live link to README, create a testing plan.
+AI did: `gh repo create` failed because an empty repo with that name already existed on the account. Then `git push` over HTTPS failed ("could not read Username — Device not configured") even though `gh auth login` had succeeded. Switched the remote to SSH and push worked. Pages enabled via `gh api`, site returned 200 on first poll.
+Problem / what we checked: two errors — stale empty repo on GitHub, and HTTPS git credentials not linked to `gh` auth. Had to work around both.
+What we decided and why: (Petr to fill)
+Lesson: (Petr to fill)

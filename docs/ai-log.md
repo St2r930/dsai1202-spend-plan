@@ -47,3 +47,10 @@ AI did: rewrote the chart, added banner/explainer/legend/tooltips, merged duplic
 Problem / what we checked: the v0.5 chart compared every past day's spending to TODAY's daily limit. That limit shifts every time you spend, so early days looked "over budget" even if they were fine at the time. The user spotted this. AI suggested a fixed "planned daily" line = (budget − total bills) / days in month, which is the same for every day and doesn't change retroactively.
 What we decided and why: (Petr to fill)
 Lesson: (Petr to fill)
+
+## 2026-10-22 · St2r930 · Claude Code
+Asked AI to: fix 8 issues in v0.6 — chart readability, wrapping text, amount field, plan-vs-daily explanation, example data.
+AI did: taller chart with round Y-axis ($0/$50/$100), 12px labels, removed redundant "Plan $42/day" text, added note explaining plan vs current limit, spread example data across all past days. Fixed pace-row and stat wrapping with nowrap+auto columns.
+Problem / what we checked: item 5 (text wrapping) was requested in v0.6 but AI skipped it — the `white-space:nowrap` was added to `label` elements only, not to the pace rows or stat descriptions that were actually wrapping. Had to fix it properly this round.
+What we decided and why: (Petr to fill)
+Lesson: (Petr to fill)

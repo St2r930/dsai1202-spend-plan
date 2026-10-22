@@ -57,12 +57,12 @@ h2{font-family:var(--f-display);font-weight:600;font-size:1.1rem;margin:0}
 .stat{display:grid;gap:2px;min-width:0}
 .stat .k{font-size:12px;color:var(--muted);letter-spacing:.03em}
 .stat .v{font-family:var(--f-num);font-variant-numeric:tabular-nums;font-size:1.15rem}
-.stat .d{font-size:12px;color:var(--muted)}
+.stat .d{font-size:12px;color:var(--muted);white-space:nowrap}
 .next{background:var(--accent-soft);border-radius:8px;padding:10px 12px;font-size:14px;margin-top:8px}
 .next b{color:var(--accent)}
 .next.alert{background:var(--bad-soft)} .next.alert b{color:var(--bad)}
 .pace{display:grid;gap:6px;margin-top:6px}
-.pace-row{display:grid;grid-template-columns:100px 1fr 44px;align-items:center;gap:10px;font-size:13px}
+.pace-row{display:grid;grid-template-columns:auto 1fr 44px;align-items:center;gap:10px;font-size:13px;white-space:nowrap}
 .track{height:8px;background:var(--line);border-radius:4px;overflow:hidden}
 .fill{height:100%;background:var(--accent)} .fill.time{background:var(--muted)} .fill.over{background:var(--bad)}
 label{display:grid;gap:4px;font-size:13px;color:var(--muted);white-space:nowrap}
@@ -145,7 +145,7 @@ details summary{cursor:pointer;font-family:var(--f-display);font-weight:600;font
   <section class="card" aria-labelledby="addH">
     <h2 id="addH">Add spending</h2>
     <form id="addForm" class="addrow">
-      <label>Amount $<input id="amt" type="number" min="0.01" step="0.01" inputmode="decimal" placeholder="0.00"></label>
+      <label>Amount $<input id="amt" type="number" min="0.01" step="0.01" inputmode="decimal"></label>
       <label>What for<input id="desc" type="text" placeholder="e.g. Lunch, new jacket"></label>
       <label class="wide">Category<select id="cat"></select></label>
       <div class="preview wide" id="preview"><span class="pill fit">Tip</span><span class="txt">Type an amount to see how it changes your daily limit before you add it.</span></div>
@@ -170,6 +170,7 @@ details summary{cursor:pointer;font-family:var(--f-display);font-weight:600;font
       <div class="chart-tip" id="chartTip"></div>
     </div>
     <div class="chart-legend" id="chartLegend"></div>
+    <div class="small muted" id="chartNote"></div>
     <div class="tablewrap"><table><tbody id="logBody"></tbody></table></div>
   </section>
   </div>
@@ -205,19 +206,33 @@ const dateOf=d=>`${MONTH_KEY}-${String(d).padStart(2,"0")}`;
 
 function example(){
   const d=n=>dateOf(Math.max(1,Math.min(TODAY,n)));
+  const yesterday=Math.max(1,TODAY-1);
+  // daily spending items spread across the month so the chart looks realistic
+  const meals=[
+    {desc:"Groceries",cat:"Food"},{desc:"Canteen lunch",cat:"Food"},
+    {desc:"Dinner out",cat:"Food"},{desc:"Snacks",cat:"Food"},
+    {desc:"Bubble tea",cat:"Fun"},{desc:"Canteen meals",cat:"Food"}
+  ];
+  const log=[
+    {date:d(1),desc:"Hall fee",cat:"Rent",amt:1200},
+    {date:d(3),desc:"Octopus top-up",cat:"Transport",amt:155},
+    {date:d(5),desc:"Phone bill",cat:"Phone & internet",amt:185},
+    {date:d(8),desc:"Concert ticket",cat:"Fun",amt:120},
+    {date:d(Math.min(15,yesterday)),desc:"Octopus top-up",cat:"Transport",amt:155}
+  ];
+  // add a food/fun item every 1–2 days up to yesterday
+  const rng=n=>[37,67,29,53,41,61,43,59,31,71,47,23,73,19,83,17,79,13,89,11];
+  const amounts=rng();
+  for(let day=1,ai=0;day<=yesterday;day++){
+    if(day%2===0||amounts[ai%amounts.length]%3===0){
+      const m=meals[ai%meals.length];
+      log.push({date:d(day),desc:m.desc,cat:m.cat,amt:30+amounts[ai%amounts.length]%50});
+      ai++;
+    }
+  }
   return {budget:3000,
     bills:[{name:"Rent",monthly:1200},{name:"Transport",monthly:310},{name:"Phone & internet",monthly:185}],
-    log:[
-      {date:d(1),desc:"Hall fee",cat:"Rent",amt:1200},
-      {date:d(2),desc:"Groceries",cat:"Food",amt:95},
-      {date:d(3),desc:"Octopus top-up",cat:"Transport",amt:80},
-      {date:d(5),desc:"Concert ticket",cat:"Fun",amt:180},
-      {date:d(7),desc:"Groceries",cat:"Food",amt:110},
-      {date:d(8),desc:"Dinner with friends",cat:"Food",amt:125},
-      {date:d(9),desc:"Octopus top-up",cat:"Transport",amt:75},
-      {date:d(10),desc:"Canteen meals",cat:"Food",amt:55},
-      {date:d(11),desc:"Game sale",cat:"Fun",amt:80}
-    ]};
+    log};
 }
 let S;
 function load(){try{const r=localStorage.getItem(KEY);if(r){S=JSON.parse(r);return}}catch(e){}S=example()}
@@ -354,6 +369,11 @@ $("addForm").addEventListener("submit",ev=>{ev.preventDefault();
    Reference line: planned daily = (budget − total bills) / days in month.
    This is a fixed benchmark — it doesn't shift as you spend, so every day
    is compared to the same fair target.                                    */
+function niceMax(v){
+  if(v<=0)return 100;
+  const step=v<=100?10:v<=500?50:v<=1000?100:v<=2000?200:500;
+  return Math.ceil(v/step)*step;
+}
 function renderChart(){
   const billNames=new Set(S.bills.map(b=>b.name));
   const dailyLog=monthLog().filter(e=>!billNames.has(e.cat));
@@ -361,72 +381,68 @@ function renderChart(){
   dailyLog.forEach(e=>{const d=+e.date.slice(8);if(d>=1&&d<=DAYS)perDay[d-1]+=e.amt});
   const totalBills=S.bills.reduce((a,b)=>a+b.monthly,0);
   const planned=Math.max(0,(S.budget-totalBills)/DAYS);
-  const maxVal=Math.max(planned,...perDay,1)*1.15;
+  const c=compute();
+  const rawMax=Math.max(planned,...perDay,1)*1.1;
+  const ceilMax=niceMax(rawMax);
   const cs=getComputedStyle(document.documentElement);
   const accent=cs.getPropertyValue("--accent").trim();
   const muted=cs.getPropertyValue("--muted").trim();
   const linec=cs.getPropertyValue("--line").trim();
   const warn=cs.getPropertyValue("--warn").trim();
-  const bg=cs.getPropertyValue("--bg").trim();
   const monName=NOW.toLocaleString("en-US",{month:"long"});
-  // dimensions
-  const LEFT=44,RIGHT=10,TOP=14,BOT=32;
-  const W=Math.max(320,DAYS*20+LEFT+RIGHT);
-  const H=150;
+  // dimensions — taller chart
+  const LEFT=52,RIGHT=10,TOP=16,BOT=38;
+  const W=Math.max(340,DAYS*22+LEFT+RIGHT);
+  const H=240;
   const plotW=W-LEFT-RIGHT,plotH=H-TOP-BOT;
   const step=plotW/DAYS;
-  const barW=Math.max(3,step*0.6);
+  const barW=Math.max(4,step*0.6);
   const cx=i=>LEFT+step*i+step/2;
-  const cy=v=>TOP+plotH-plotH*(Math.min(v,maxVal)/maxVal);
+  const cy=v=>TOP+plotH-plotH*(Math.min(v,ceilMax)/ceilMax);
+  const FONT=`font-family="var(--f-num)"`;
   let svg=`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" role="img" aria-label="Daily spending chart" style="cursor:default">`;
-  // y-axis labels and grid
-  const yTicks=[0,Math.round(maxVal/2),Math.round(maxVal)].filter((v,i,a)=>a.indexOf(v)===i);
-  yTicks.forEach(v=>{
+  // y-axis: round tick values
+  const yStep=ceilMax<=100?25:ceilMax<=200?50:ceilMax<=500?50:ceilMax<=1000?100:200;
+  for(let v=0;v<=ceilMax;v+=yStep){
     const y=cy(v);
     svg+=`<line x1="${LEFT}" y1="${y}" x2="${W-RIGHT}" y2="${y}" stroke="${linec}" stroke-width="0.5"/>`;
-    svg+=`<text x="${LEFT-6}" y="${y+4}" fill="${muted}" font-size="9" font-family="var(--f-num)" text-anchor="end">$${v}</text>`;
-  });
-  // planned daily line
+    svg+=`<text x="${LEFT-6}" y="${y+4}" fill="${muted}" font-size="12" ${FONT} text-anchor="end">$${v}</text>`;
+  }
+  // planned daily line (no text label — legend covers it)
   if(planned>0){
     const py=cy(planned);
     svg+=`<line x1="${LEFT}" y1="${py}" x2="${W-RIGHT}" y2="${py}" stroke="${warn}" stroke-width="1.5" stroke-dasharray="5,3"/>`;
-    svg+=`<text x="${LEFT+2}" y="${py-5}" fill="${warn}" font-size="9" font-family="var(--f-num)">Plan ${money(planned)}/day</text>`;
   }
   // bars for all days
   for(let i=0;i<DAYS;i++){
     const x=cx(i)-barW/2;
     const isFuture=i+1>TODAY;
     const isToday=i+1===TODAY;
-    // future day background
     if(isFuture){
       svg+=`<rect x="${x-1}" y="${TOP}" width="${barW+2}" height="${plotH}" rx="2" fill="${linec}" opacity="0.25"/>`;
     }
-    // today marker
     if(isToday){
       svg+=`<rect x="${x-2}" y="${TOP}" width="${barW+4}" height="${plotH}" rx="3" fill="${accent}" opacity="0.08"/>`;
     }
-    // spending bar
     const v=perDay[i];
     if(v>0&&!isFuture){
       const y=cy(v),h=cy(0)-y;
       const col=v>planned&&planned>0?warn:accent;
       svg+=`<rect x="${x}" y="${y}" width="${barW}" height="${h}" rx="2" fill="${col}" opacity="0.85"/>`;
     }
-    // invisible hover target
     svg+=`<rect class="chart-bar" data-day="${i+1}" data-amt="${Math.round(perDay[i])}" x="${cx(i)-step/2}" y="${TOP}" width="${step}" height="${plotH}" fill="transparent"/>`;
   }
-  // x-axis day labels
+  // x-axis day labels — all days visible
   const labelEvery=DAYS<=16?1:DAYS<=23?2:3;
   for(let i=0;i<DAYS;i++){
     const d=i+1;
     const show=(d%labelEvery===0)||d===1||d===TODAY;
     if(show){
       const isToday=d===TODAY;
-      svg+=`<text x="${cx(i)}" y="${H-BOT+14}" fill="${isToday?accent:muted}" font-size="${isToday?'10':'9'}" font-weight="${isToday?'600':'400'}" font-family="var(--f-num)" text-anchor="middle">${d}</text>`;
+      svg+=`<text x="${cx(i)}" y="${H-BOT+16}" fill="${isToday?accent:muted}" font-size="12" font-weight="${isToday?'600':'400'}" ${FONT} text-anchor="middle">${d}</text>`;
     }
   }
-  // x-axis label
-  svg+=`<text x="${LEFT+plotW/2}" y="${H-2}" fill="${muted}" font-size="10" font-family="var(--f-body)" text-anchor="middle">Day of ${monName}</text>`;
+  svg+=`<text x="${LEFT+plotW/2}" y="${H-4}" fill="${muted}" font-size="12" font-family="var(--f-body)" text-anchor="middle">Day of ${monName}</text>`;
   svg+=`</svg>`;
   $("chartWrap").innerHTML=svg;
   // legend
@@ -434,6 +450,16 @@ function renderChart(){
     `<span><i style="background:${accent}"></i>Daily spending</span>`+
     `<span><i style="background:${warn}"></i>Over plan</span>`+
     `<span><i style="background:${warn};height:2px;width:14px;border-radius:0"></i>Plan: ${money(planned)}/day</span>`;
+  // note explaining plan vs current daily limit
+  const daily=Math.max(0,c.daily);
+  if(planned>0&&daily!==planned){
+    const diff=daily-planned;
+    $("chartNote").innerHTML=diff>=0
+      ?`Plan = budget for daily spending ÷ ${DAYS} days (what you could spend each day from the start). You spent less than planned, so today you can spend <b>${money(daily)}</b>.`
+      :`Plan = budget for daily spending ÷ ${DAYS} days (what you could spend each day from the start). You've spent more than planned, so today's limit is down to <b>${money(daily)}</b>.`;
+  } else {
+    $("chartNote").textContent="";
+  }
   // tooltip on hover/tap
   const wrap=$("chartWrap").parentElement;
   const tip=$("chartTip");

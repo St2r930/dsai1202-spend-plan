@@ -53,8 +53,7 @@ h2{font-family:var(--f-display);font-weight:600;font-size:1.1rem;margin:0}
 .hero .label{font-size:13px;color:var(--muted)}
 .hero .big{font-family:var(--f-display);font-weight:800;font-size:clamp(2.6rem,12vw,3.6rem);line-height:1}
 .hero .sub{color:var(--muted);font-size:14px}
-.stats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px 16px;padding-bottom:14px;border-bottom:1px solid var(--line)}
-@media (min-width:480px){.stats{grid-template-columns:repeat(4,minmax(0,1fr))}}
+.stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px 16px;padding-bottom:14px;border-bottom:1px solid var(--line)}
 .stat{display:grid;gap:2px;min-width:0}
 .stat .k{font-size:12px;color:var(--muted);letter-spacing:.03em}
 .stat .v{font-family:var(--f-num);font-variant-numeric:tabular-nums;font-size:1.15rem}
@@ -66,7 +65,7 @@ h2{font-family:var(--f-display);font-weight:600;font-size:1.1rem;margin:0}
 .pace-row{display:grid;grid-template-columns:100px 1fr 44px;align-items:center;gap:10px;font-size:13px}
 .track{height:8px;background:var(--line);border-radius:4px;overflow:hidden}
 .fill{height:100%;background:var(--accent)} .fill.time{background:var(--muted)} .fill.over{background:var(--bad)}
-label{display:grid;gap:4px;font-size:13px;color:var(--muted)}
+label{display:grid;gap:4px;font-size:13px;color:var(--muted);white-space:nowrap}
 input,select{font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:9px 10px;width:100%;min-width:0}
 input:focus-visible,select:focus-visible,button:focus-visible,summary:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .addrow{display:grid;grid-template-columns:110px 1fr;gap:10px}
@@ -96,13 +95,23 @@ details summary{cursor:pointer;font-family:var(--f-display);font-weight:600;font
 .btn-row{display:flex;gap:8px;flex-wrap:wrap}
 .chart-wrap{overflow-x:auto}
 .chart-wrap svg{display:block;width:100%;height:auto}
+.chart-tip{position:absolute;pointer-events:none;background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:4px 8px;font-size:12px;font-family:var(--f-num);white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,.12);z-index:10;opacity:0;transition:opacity .15s}
+.chart-tip.show{opacity:1}
+.chart-legend{display:flex;flex-wrap:wrap;gap:8px 14px;font-size:12px;color:var(--muted);margin-top:4px}
+.chart-legend span{display:flex;align-items:center;gap:4px}
+.chart-legend i{display:inline-block;width:10px;height:10px;border-radius:2px;flex-shrink:0}
+.banner{background:var(--warn-soft);border:1px solid var(--warn);border-radius:10px;padding:12px 16px;display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;font-size:14px}
+.banner b{color:var(--warn)}
+.banner button{font-size:13px;padding:6px 14px}
+.explainer{font-size:13px;color:var(--muted);cursor:pointer;border:0;background:0;padding:0;font-family:inherit;text-decoration:underline;text-decoration-style:dotted;text-underline-offset:2px}
+.explainer-text{font-size:13px;color:var(--muted);background:var(--bg);border-radius:8px;padding:10px 12px;margin-top:4px}
 </style>
 </head>
 <body>
 
 <div class="wrap">
   <header>
-    <div><span class="tag">DSAI1202 · PROTOTYPE v0.5</span><h1 class="title">Here is how to finish the month.</h1></div>
+    <div><span class="tag">DSAI1202 · PROTOTYPE v0.6</span><h1 class="title">Here is how to finish the month.</h1></div>
     <div class="btn-row">
       <button class="ghost tiny" id="exportBtn" type="button">Export CSV</button>
       <button class="ghost tiny" id="importBtn" type="button">Import CSV</button>
@@ -110,6 +119,11 @@ details summary{cursor:pointer;font-family:var(--f-display);font-weight:600;font
       <input type="file" id="csvFile" accept=".csv" hidden>
     </div>
   </header>
+
+  <div class="banner" id="demoBanner" hidden>
+    <span><b>This is example data</b> — set your own budget to get started.</span>
+    <button type="button" id="setupMyBtn">Set up my budget</button>
+  </div>
 
   <div class="layout">
   <div class="col">
@@ -119,6 +133,7 @@ details summary{cursor:pointer;font-family:var(--f-display);font-weight:600;font
     <div class="label" style="margin-top:10px">You can spend per day</div>
     <div class="big num" id="daily">$0</div>
     <div class="sub" id="dailySub"></div>
+    <div id="explainerWrap"></div>
     <div class="pace">
       <div class="pace-row"><span>Budget used</span><div class="track"><div class="fill" id="usedBar"></div></div><span class="num" id="usedPct"></span></div>
       <div class="pace-row"><span>Month passed</span><div class="track"><div class="fill time" id="timeBar"></div></div><span class="num" id="timePct"></span></div>
@@ -130,7 +145,7 @@ details summary{cursor:pointer;font-family:var(--f-display);font-weight:600;font
   <section class="card" aria-labelledby="addH">
     <h2 id="addH">Add spending</h2>
     <form id="addForm" class="addrow">
-      <label>Amount $<input id="amt" type="number" min="0.01" step="0.01" inputmode="decimal" placeholder="0"></label>
+      <label>Amount $<input id="amt" type="number" min="0.01" step="0.01" inputmode="decimal" placeholder="0.00"></label>
       <label>What for<input id="desc" type="text" placeholder="e.g. Lunch, new jacket"></label>
       <label class="wide">Category<select id="cat"></select></label>
       <div class="preview wide" id="preview"><span class="pill fit">Tip</span><span class="txt">Type an amount to see how it changes your daily limit before you add it.</span></div>
@@ -150,7 +165,11 @@ details summary{cursor:pointer;font-family:var(--f-display);font-weight:600;font
   <!-- 4. HISTORY -->
   <section class="card" aria-labelledby="logH">
     <h2 id="logH">This month's spending</h2>
-    <div class="chart-wrap" id="chartWrap"></div>
+    <div style="position:relative">
+      <div class="chart-wrap" id="chartWrap"></div>
+      <div class="chart-tip" id="chartTip"></div>
+    </div>
+    <div class="chart-legend" id="chartLegend"></div>
     <div class="tablewrap"><table><tbody id="logBody"></tbody></table></div>
   </section>
   </div>
@@ -243,16 +262,26 @@ function judge(amt,cat){
   return {cls:"warn",label:"Think twice",txt:`Daily limit drops from ${money(before.daily)} to ${money(after.daily)} for ${before.daysLeft} days.`};
 }
 
+function isExample(){
+  const ex=example();
+  return S.budget===ex.budget&&S.bills.length===ex.bills.length&&
+    S.bills.every((b,i)=>b.name===ex.bills[i].name&&b.monthly===ex.bills[i].monthly)&&
+    S.log.length===ex.log.length&&S.log.every((e,i)=>e.desc===ex.log[i].desc&&e.amt===ex.log[i].amt);
+}
+
 function render(){
   const c=compute();
   const mon=NOW.toLocaleString("en-US",{month:"short"});
+  // example banner
+  $("demoBanner").hidden=!isExample();
   $("stats").innerHTML=
     `<div class="stat"><span class="k">Budget</span><span class="v">${money(S.budget)}</span><span class="d">${mon} 1 – ${mon} ${DAYS} · ${DAYS} days</span></div>`+
     `<div class="stat"><span class="k">Spent</span><span class="v">${money(c.spent)}</span><span class="d">in ${TODAY} day${TODAY>1?"s":""}</span></div>`+
-    `<div class="stat"><span class="k">Left</span><span class="v">${money(c.remaining)}</span><span class="d">incl. ${money(c.billsLeft)} bills</span></div>`+
     `<div class="stat"><span class="k">To go</span><span class="v">${c.daysLeft} days</span><span class="d">incl. today</span></div>`;
   $("daily").textContent=money(Math.max(0,c.daily));
   $("dailySub").textContent=`for food and everything else · ${c.daysLeft} days left in ${NOW.toLocaleString("en-US",{month:"long"})}`;
+  // explainer
+  $("explainerWrap").innerHTML=`<button class="explainer" type="button" id="explainerBtn">How is this calculated?</button><div class="explainer-text" id="explainerBody" hidden>${money(c.remaining)} left − ${money(c.billsLeft)} for bills = ${money(c.forDaily)} for daily spending ÷ ${c.daysLeft} days = <b>${money(Math.max(0,c.daily))}/day</b></div>`;
   const up=Math.round(c.usedShare*100),tp=Math.round(c.timeShare*100);
   $("usedBar").style.width=Math.min(100,up)+"%";$("usedBar").classList.toggle("over",up>tp+5);
   $("usedPct").textContent=up+"%";$("timeBar").style.width=tp+"%";$("timePct").textContent=tp+"%";
@@ -311,6 +340,8 @@ document.addEventListener("click",ev=>{
   else if(t.dataset.bd!==undefined){S.bills.splice(+t.dataset.bd,1)}
   else if(t.id==="addBill"){S.bills.push({name:"New bill",monthly:0})}
   else if(t.id==="resetBtn"){S=example()}
+  else if(t.id==="setupMyBtn"){S={budget:0,bills:[],log:[]};save();render();document.querySelector("details").open=true;$("sBudget").focus();return}
+  else if(t.id==="explainerBtn"){const b=$("explainerBody");b.hidden=!b.hidden;return}
   else return;
   save();render();
 });
@@ -319,55 +350,105 @@ $("addForm").addEventListener("submit",ev=>{ev.preventDefault();
   S.log.push({date:dateOf(TODAY),desc:$("desc").value.trim()||$("cat").value,cat:$("cat").value,amt});
   $("amt").value="";$("desc").value="";save();render();});
 
-/* ---- Daily spending chart (SVG) ---- */
+/* ---- Daily spending chart (SVG) ----
+   Reference line: planned daily = (budget − total bills) / days in month.
+   This is a fixed benchmark — it doesn't shift as you spend, so every day
+   is compared to the same fair target.                                    */
 function renderChart(){
   const billNames=new Set(S.bills.map(b=>b.name));
   const dailyLog=monthLog().filter(e=>!billNames.has(e.cat));
-  const perDay=new Array(TODAY).fill(0);
-  dailyLog.forEach(e=>{const d=+e.date.slice(8);if(d>=1&&d<=TODAY)perDay[d-1]+=e.amt});
-  const c=compute();
-  const limit=Math.max(0,c.daily);
-  const maxVal=Math.max(limit,...perDay,1);
-  const W=Math.max(320,TODAY*28),H=120,pad=28,bot=18;
-  const plotH=H-pad-bot;
-  const barW=Math.max(4,Math.min(18,(W-40)/TODAY-2));
-  const step=(W-40)/TODAY;
-  const xs=i=>20+step*i+step/2;
-  const yOf=v=>pad+plotH-plotH*(v/maxVal);
-  const style=getComputedStyle(document.documentElement);
-  const accent=style.getPropertyValue("--accent").trim();
-  const muted=style.getPropertyValue("--muted").trim();
-  const line=style.getPropertyValue("--line").trim();
-  const warn=style.getPropertyValue("--warn").trim();
-  let svg=`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" role="img" aria-label="Daily spending chart">`;
-  // grid lines
-  const steps=[0,.25,.5,.75,1];
-  steps.forEach(s=>{
-    const y=yOf(maxVal*s);
-    svg+=`<line x1="20" y1="${y}" x2="${W-20}" y2="${y}" stroke="${line}" stroke-width="0.5"/>`;
+  const perDay=new Array(DAYS).fill(0);
+  dailyLog.forEach(e=>{const d=+e.date.slice(8);if(d>=1&&d<=DAYS)perDay[d-1]+=e.amt});
+  const totalBills=S.bills.reduce((a,b)=>a+b.monthly,0);
+  const planned=Math.max(0,(S.budget-totalBills)/DAYS);
+  const maxVal=Math.max(planned,...perDay,1)*1.15;
+  const cs=getComputedStyle(document.documentElement);
+  const accent=cs.getPropertyValue("--accent").trim();
+  const muted=cs.getPropertyValue("--muted").trim();
+  const linec=cs.getPropertyValue("--line").trim();
+  const warn=cs.getPropertyValue("--warn").trim();
+  const bg=cs.getPropertyValue("--bg").trim();
+  const monName=NOW.toLocaleString("en-US",{month:"long"});
+  // dimensions
+  const LEFT=44,RIGHT=10,TOP=14,BOT=32;
+  const W=Math.max(320,DAYS*20+LEFT+RIGHT);
+  const H=150;
+  const plotW=W-LEFT-RIGHT,plotH=H-TOP-BOT;
+  const step=plotW/DAYS;
+  const barW=Math.max(3,step*0.6);
+  const cx=i=>LEFT+step*i+step/2;
+  const cy=v=>TOP+plotH-plotH*(Math.min(v,maxVal)/maxVal);
+  let svg=`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" role="img" aria-label="Daily spending chart" style="cursor:default">`;
+  // y-axis labels and grid
+  const yTicks=[0,Math.round(maxVal/2),Math.round(maxVal)].filter((v,i,a)=>a.indexOf(v)===i);
+  yTicks.forEach(v=>{
+    const y=cy(v);
+    svg+=`<line x1="${LEFT}" y1="${y}" x2="${W-RIGHT}" y2="${y}" stroke="${linec}" stroke-width="0.5"/>`;
+    svg+=`<text x="${LEFT-6}" y="${y+4}" fill="${muted}" font-size="9" font-family="var(--f-num)" text-anchor="end">$${v}</text>`;
   });
-  // daily limit line
-  if(limit>0){
-    const ly=yOf(limit);
-    svg+=`<line x1="20" y1="${ly}" x2="${W-20}" y2="${ly}" stroke="${warn}" stroke-width="1.5" stroke-dasharray="5,3"/>`;
-    svg+=`<text x="${W-18}" y="${ly-4}" fill="${warn}" font-size="10" font-family="var(--f-num)" text-anchor="end">${money(limit)}/day</text>`;
+  // planned daily line
+  if(planned>0){
+    const py=cy(planned);
+    svg+=`<line x1="${LEFT}" y1="${py}" x2="${W-RIGHT}" y2="${py}" stroke="${warn}" stroke-width="1.5" stroke-dasharray="5,3"/>`;
+    svg+=`<text x="${LEFT+2}" y="${py-5}" fill="${warn}" font-size="9" font-family="var(--f-num)">Plan ${money(planned)}/day</text>`;
   }
-  // bars
-  perDay.forEach((v,i)=>{
-    if(v===0)return;
-    const x=xs(i)-barW/2,y=yOf(v),h=yOf(0)-y;
-    const col=v>limit&&limit>0?warn:accent;
-    svg+=`<rect x="${x}" y="${y}" width="${barW}" height="${h}" rx="2" fill="${col}" opacity="0.85"/>`;
-  });
-  // day labels (show every Nth to avoid clutter)
-  const labelEvery=TODAY<=15?1:TODAY<=22?2:3;
-  for(let i=0;i<TODAY;i++){
-    if((i+1)%labelEvery===0||i===0){
-      svg+=`<text x="${xs(i)}" y="${H-4}" fill="${muted}" font-size="10" font-family="var(--f-num)" text-anchor="middle">${i+1}</text>`;
+  // bars for all days
+  for(let i=0;i<DAYS;i++){
+    const x=cx(i)-barW/2;
+    const isFuture=i+1>TODAY;
+    const isToday=i+1===TODAY;
+    // future day background
+    if(isFuture){
+      svg+=`<rect x="${x-1}" y="${TOP}" width="${barW+2}" height="${plotH}" rx="2" fill="${linec}" opacity="0.25"/>`;
+    }
+    // today marker
+    if(isToday){
+      svg+=`<rect x="${x-2}" y="${TOP}" width="${barW+4}" height="${plotH}" rx="3" fill="${accent}" opacity="0.08"/>`;
+    }
+    // spending bar
+    const v=perDay[i];
+    if(v>0&&!isFuture){
+      const y=cy(v),h=cy(0)-y;
+      const col=v>planned&&planned>0?warn:accent;
+      svg+=`<rect x="${x}" y="${y}" width="${barW}" height="${h}" rx="2" fill="${col}" opacity="0.85"/>`;
+    }
+    // invisible hover target
+    svg+=`<rect class="chart-bar" data-day="${i+1}" data-amt="${Math.round(perDay[i])}" x="${cx(i)-step/2}" y="${TOP}" width="${step}" height="${plotH}" fill="transparent"/>`;
+  }
+  // x-axis day labels
+  const labelEvery=DAYS<=16?1:DAYS<=23?2:3;
+  for(let i=0;i<DAYS;i++){
+    const d=i+1;
+    const show=(d%labelEvery===0)||d===1||d===TODAY;
+    if(show){
+      const isToday=d===TODAY;
+      svg+=`<text x="${cx(i)}" y="${H-BOT+14}" fill="${isToday?accent:muted}" font-size="${isToday?'10':'9'}" font-weight="${isToday?'600':'400'}" font-family="var(--f-num)" text-anchor="middle">${d}</text>`;
     }
   }
+  // x-axis label
+  svg+=`<text x="${LEFT+plotW/2}" y="${H-2}" fill="${muted}" font-size="10" font-family="var(--f-body)" text-anchor="middle">Day of ${monName}</text>`;
   svg+=`</svg>`;
   $("chartWrap").innerHTML=svg;
+  // legend
+  $("chartLegend").innerHTML=
+    `<span><i style="background:${accent}"></i>Daily spending</span>`+
+    `<span><i style="background:${warn}"></i>Over plan</span>`+
+    `<span><i style="background:${warn};height:2px;width:14px;border-radius:0"></i>Plan: ${money(planned)}/day</span>`;
+  // tooltip on hover/tap
+  const wrap=$("chartWrap").parentElement;
+  const tip=$("chartTip");
+  wrap.addEventListener("pointermove",ev=>{
+    const bar=ev.target.closest(".chart-bar");
+    if(!bar){tip.classList.remove("show");return}
+    const d=bar.dataset.day,a=bar.dataset.amt;
+    const future=+d>TODAY;
+    tip.textContent=future?`Day ${d} (future)`:`Day ${d}: $${a}`;
+    tip.classList.add("show");
+    const rect=wrap.getBoundingClientRect();
+    tip.style.left=(ev.clientX-rect.left+12)+"px";
+    tip.style.top=(ev.clientY-rect.top-28)+"px";
+  });
+  wrap.addEventListener("pointerleave",()=>tip.classList.remove("show"));
 }
 
 /* ---- CSV Export ---- */

@@ -40,6 +40,7 @@ daily      = forDaily / daysLeft
 | v0.3 | Two-column layout for laptops. | The phone-first layout felt cramped on a laptop. |
 | v0.4 | Budget, spent, left and days-to-go shown at the top. | It was not visible how much budget there was and how long it had to last. |
 | v0.5 | Export/Import CSV; daily spending bar chart (SVG, no libraries). | Need to share data between devices and see spending patterns at a glance. |
+| v0.6 | Chart: full month with future days greyed out, today marked, Y-axis amounts, hover tooltips, legend; plan line instead of shifting daily limit; example data banner; "How is this calculated?" explainer; removed duplicate "Left" stat; small UX fixes. | First-time users found the page confusing. |
 
 ## Use of AI
 

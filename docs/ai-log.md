@@ -54,3 +54,10 @@ AI did: taller chart with round Y-axis ($0/$50/$100), 12px labels, removed redun
 Problem / what we checked: item 5 (text wrapping) was requested in v0.6 but AI skipped it — the `white-space:nowrap` was added to `label` elements only, not to the pace rows or stat descriptions that were actually wrapping. Had to fix it properly this round.
 What we decided and why: (Petr to fill)
 Lesson: (Petr to fill)
+
+## 2026-10-22 · St2r930 · Claude Code
+Asked AI to: fix stat overlap, $0 bar segments, chart text size (third attempt), and logic contradiction between pace bar and chart.
+AI did: shortened stat descriptions, hid $0 split segments, switched SVG from viewBox scaling to fixed pixel sizes (so 12px means 12px), changed "Budget used" to track daily spending only (excluding bills). Used Playwright screenshots to verify before reporting done — caught overlapping day labels "2122" on mobile and fixed by skipping regular labels adjacent to today.
+Problem / what we checked: (1) chart text was requested at 12px twice before but SVG viewBox scaling shrank it — AI hadn't realized the viewBox was downscaling fonts. Fixed by using `width`/`height` attributes instead. (2) "79% budget used" included rent paid on day 1, contradicting the chart note "you spent less than planned". Changed pace to track daily categories only vs daily budget. (3) Previous fixes (nowrap on stats) caused a new overlap — this round AI checked screenshots before reporting done.
+What we decided and why: (Petr to fill)
+Lesson: (Petr to fill)

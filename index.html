@@ -57,7 +57,7 @@ h2{font-family:var(--f-display);font-weight:600;font-size:1.1rem;margin:0}
 .stat{display:grid;gap:2px;min-width:0}
 .stat .k{font-size:12px;color:var(--muted);letter-spacing:.03em}
 .stat .v{font-family:var(--f-num);font-variant-numeric:tabular-nums;font-size:1.15rem}
-.stat .d{font-size:12px;color:var(--muted);white-space:nowrap}
+.stat .d{font-size:12px;color:var(--muted)}
 .next{background:var(--accent-soft);border-radius:8px;padding:10px 12px;font-size:14px;margin-top:8px}
 .next b{color:var(--accent)}
 .next.alert{background:var(--bad-soft)} .next.alert b{color:var(--bad)}
@@ -94,7 +94,7 @@ details summary{cursor:pointer;font-family:var(--f-display);font-weight:600;font
 @media (prefers-reduced-motion:no-preference){.fill,.split div{transition:width .3s ease}}
 .btn-row{display:flex;gap:8px;flex-wrap:wrap}
 .chart-wrap{overflow-x:auto}
-.chart-wrap svg{display:block;width:100%;height:auto}
+.chart-wrap svg{display:block}
 .chart-tip{position:absolute;pointer-events:none;background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:4px 8px;font-size:12px;font-family:var(--f-num);white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,.12);z-index:10;opacity:0;transition:opacity .15s}
 .chart-tip.show{opacity:1}
 .chart-legend{display:flex;flex-wrap:wrap;gap:8px 14px;font-size:12px;color:var(--muted);margin-top:4px}
@@ -111,7 +111,7 @@ details summary{cursor:pointer;font-family:var(--f-display);font-weight:600;font
 
 <div class="wrap">
   <header>
-    <div><span class="tag">DSAI1202 · PROTOTYPE v0.6</span><h1 class="title">Here is how to finish the month.</h1></div>
+    <div><span class="tag">DSAI1202 · PROTOTYPE v0.7</span><h1 class="title">Here is how to finish the month.</h1></div>
     <div class="btn-row">
       <button class="ghost tiny" id="exportBtn" type="button">Export CSV</button>
       <button class="ghost tiny" id="importBtn" type="button">Import CSV</button>
@@ -135,7 +135,7 @@ details summary{cursor:pointer;font-family:var(--f-display);font-weight:600;font
     <div class="sub" id="dailySub"></div>
     <div id="explainerWrap"></div>
     <div class="pace">
-      <div class="pace-row"><span>Budget used</span><div class="track"><div class="fill" id="usedBar"></div></div><span class="num" id="usedPct"></span></div>
+      <div class="pace-row"><span>Daily budget used</span><div class="track"><div class="fill" id="usedBar"></div></div><span class="num" id="usedPct"></span></div>
       <div class="pace-row"><span>Month passed</span><div class="track"><div class="fill time" id="timeBar"></div></div><span class="num" id="timePct"></span></div>
     </div>
     <div class="next" id="nextAction"></div>
@@ -290,28 +290,37 @@ function render(){
   // example banner
   $("demoBanner").hidden=!isExample();
   $("stats").innerHTML=
-    `<div class="stat"><span class="k">Budget</span><span class="v">${money(S.budget)}</span><span class="d">${mon} 1 – ${mon} ${DAYS} · ${DAYS} days</span></div>`+
-    `<div class="stat"><span class="k">Spent</span><span class="v">${money(c.spent)}</span><span class="d">in ${TODAY} day${TODAY>1?"s":""}</span></div>`+
+    `<div class="stat"><span class="k">Budget</span><span class="v">${money(S.budget)}</span><span class="d">${mon} 1–${DAYS}</span></div>`+
+    `<div class="stat"><span class="k">Spent</span><span class="v">${money(c.spent)}</span><span class="d">${TODAY} days</span></div>`+
     `<div class="stat"><span class="k">To go</span><span class="v">${c.daysLeft} days</span><span class="d">incl. today</span></div>`;
   $("daily").textContent=money(Math.max(0,c.daily));
   $("dailySub").textContent=`for food and everything else · ${c.daysLeft} days left in ${NOW.toLocaleString("en-US",{month:"long"})}`;
   // explainer
   $("explainerWrap").innerHTML=`<button class="explainer" type="button" id="explainerBtn">How is this calculated?</button><div class="explainer-text" id="explainerBody" hidden>${money(c.remaining)} left − ${money(c.billsLeft)} for bills = ${money(c.forDaily)} for daily spending ÷ ${c.daysLeft} days = <b>${money(Math.max(0,c.daily))}/day</b></div>`;
-  const up=Math.round(c.usedShare*100),tp=Math.round(c.timeShare*100);
+  // Pace: compare daily spending (excluding bills) to the daily plan budget,
+  // so paying rent on day 1 doesn't make the pace look bad.
+  const billNames=new Set(S.bills.map(b=>b.name));
+  const dailySpent=monthLog().filter(e=>!billNames.has(e.cat)).reduce((a,e)=>a+e.amt,0);
+  const dailyBudget=S.budget-S.bills.reduce((a,b)=>a+b.monthly,0);
+  const up=dailyBudget>0?Math.round(dailySpent/dailyBudget*100):0;
+  const tp=Math.round(c.timeShare*100);
   $("usedBar").style.width=Math.min(100,up)+"%";$("usedBar").classList.toggle("over",up>tp+5);
   $("usedPct").textContent=up+"%";$("timeBar").style.width=tp+"%";$("timePct").textContent=tp+"%";
 
   const nx=$("nextAction");nx.classList.toggle("alert",c.forDaily<0);
   if(c.forDaily<0) nx.innerHTML=`<b>Your bills are at risk.</b> You are ${money(-c.forDaily)} short. Stop non-essential spending until the month ends.`;
-  else if(up>tp+5) nx.innerHTML=`You've used <b>${up}% of your budget in ${tp}% of the month</b>. Stay under <b>${money(c.daily)}/day</b> and you'll still cover your bills.`;
+  else if(up>tp+5) nx.innerHTML=`You've used <b>${up}% of your daily budget</b> in <b>${tp}% of the month</b>. Stay under <b>${money(c.daily)}/day</b> to stay on track.`;
   else nx.innerHTML=`You're on track. Stay under <b>${money(c.daily)}/day</b> and you'll finish the month with money for every bill.`;
 
   const tot=Math.max(1,c.billsLeft+Math.max(0,c.forDaily));
-  $("splitR").style.width=c.billsLeft/tot*100+"%";$("splitR").textContent="Bills "+money(c.billsLeft);
-  $("splitF").style.width=Math.max(0,c.forDaily)/tot*100+"%";$("splitF").textContent="Daily "+money(Math.max(0,c.forDaily));
+  const showBills=c.billsLeft>0,showDaily=c.forDaily>0;
+  $("splitR").style.width=showBills?(c.billsLeft/tot*100+"%"):"0";$("splitR").textContent=showBills?("Bills "+money(c.billsLeft)):"";
+  $("splitF").style.width=showDaily?(Math.max(0,c.forDaily)/tot*100+"%"):"0";$("splitF").textContent=showDaily?("Daily "+money(Math.max(0,c.forDaily))):"";
+  const unpaid=c.bills.filter(b=>b.left>0);
   $("planKv").innerHTML=`<span>Left this month</span><span class="num">${money(c.remaining)}</span>`+
-    c.bills.filter(b=>b.left>0).map(b=>`<span class="muted">− ${esc(b.name)} still to pay</span><span class="num muted">${money(b.left)}</span>`).join("")+
-    `<span class="total">For daily spending</span><span class="num total">${money(c.forDaily)}</span>`;
+    (unpaid.length?unpaid.map(b=>`<span class="muted">\u2212 ${esc(b.name)} still to pay</span><span class="num muted">${money(b.left)}</span>`).join("")
+    :(S.bills.length?`<span class="muted">All bills paid \u2713</span><span></span>`:``))
+    +`<span class="total">For daily spending</span><span class="num total">${money(c.forDaily)}</span>`;
 
   const cur=$("cat").value;
   const cats=[...DAILY_CATS,...S.bills.map(b=>b.name)];
@@ -390,17 +399,18 @@ function renderChart(){
   const linec=cs.getPropertyValue("--line").trim();
   const warn=cs.getPropertyValue("--warn").trim();
   const monName=NOW.toLocaleString("en-US",{month:"long"});
-  // dimensions — taller chart
-  const LEFT=52,RIGHT=10,TOP=16,BOT=38;
-  const W=Math.max(340,DAYS*22+LEFT+RIGHT);
-  const H=240;
+  // Use measured container width so SVG font sizes = real pixels
+  const containerW=$("chartWrap").clientWidth||500;
+  const LEFT=48,RIGHT=8,TOP=12,BOT=36;
+  const W=Math.max(containerW,DAYS*12+LEFT+RIGHT);
+  const H=220;
   const plotW=W-LEFT-RIGHT,plotH=H-TOP-BOT;
   const step=plotW/DAYS;
-  const barW=Math.max(4,step*0.6);
+  const barW=Math.max(3,step*0.55);
   const cx=i=>LEFT+step*i+step/2;
   const cy=v=>TOP+plotH-plotH*(Math.min(v,ceilMax)/ceilMax);
   const FONT=`font-family="var(--f-num)"`;
-  let svg=`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" role="img" aria-label="Daily spending chart" style="cursor:default">`;
+  let svg=`<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" role="img" aria-label="Daily spending chart" style="cursor:default">`;
   // y-axis: round tick values
   const yStep=ceilMax<=100?25:ceilMax<=200?50:ceilMax<=500?50:ceilMax<=1000?100:200;
   for(let v=0;v<=ceilMax;v+=yStep){
@@ -432,14 +442,16 @@ function renderChart(){
     }
     svg+=`<rect class="chart-bar" data-day="${i+1}" data-amt="${Math.round(perDay[i])}" x="${cx(i)-step/2}" y="${TOP}" width="${step}" height="${plotH}" fill="transparent"/>`;
   }
-  // x-axis day labels — all days visible
+  // x-axis day labels — skip regular labels adjacent to today to avoid overlap
   const labelEvery=DAYS<=16?1:DAYS<=23?2:3;
   for(let i=0;i<DAYS;i++){
     const d=i+1;
-    const show=(d%labelEvery===0)||d===1||d===TODAY;
+    const isToday=d===TODAY;
+    const isRegular=(d%labelEvery===0)||d===1;
+    if(!isToday&&isRegular&&Math.abs(d-TODAY)<=1)continue;
+    const show=isToday||isRegular;
     if(show){
-      const isToday=d===TODAY;
-      svg+=`<text x="${cx(i)}" y="${H-BOT+16}" fill="${isToday?accent:muted}" font-size="12" font-weight="${isToday?'600':'400'}" ${FONT} text-anchor="middle">${d}</text>`;
+      svg+=`<text x="${cx(i)}" y="${H-BOT+15}" fill="${isToday?accent:muted}" font-size="12" font-weight="${isToday?'600':'400'}" ${FONT} text-anchor="middle">${d}</text>`;
     }
   }
   svg+=`<text x="${LEFT+plotW/2}" y="${H-4}" fill="${muted}" font-size="12" font-family="var(--f-body)" text-anchor="middle">Day of ${monName}</text>`;

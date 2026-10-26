@@ -314,8 +314,12 @@ function render(){
 
   const tot=Math.max(1,c.billsLeft+Math.max(0,c.forDaily));
   const showBills=c.billsLeft>0,showDaily=c.forDaily>0;
-  $("splitR").style.width=showBills?(c.billsLeft/tot*100+"%"):"0";$("splitR").textContent=showBills?("Bills "+money(c.billsLeft)):"";
-  $("splitF").style.width=showDaily?(Math.max(0,c.forDaily)/tot*100+"%"):"0";$("splitF").textContent=showDaily?("Daily "+money(Math.max(0,c.forDaily))):"";
+  const billsPct=showBills?(c.billsLeft/tot*100):0;
+  const dailyPct=showDaily?(Math.max(0,c.forDaily)/tot*100):0;
+  $("splitR").style.display=showBills?"":"none";
+  $("splitR").style.width=billsPct+"%";$("splitR").textContent=billsPct>12?("Bills "+money(c.billsLeft)):"";
+  $("splitF").style.display=showDaily?"":"none";
+  $("splitF").style.width=dailyPct+"%";$("splitF").textContent=dailyPct>12?("Daily "+money(Math.max(0,c.forDaily))):"";
   const unpaid=c.bills.filter(b=>b.left>0);
   $("planKv").innerHTML=`<span>Left this month</span><span class="num">${money(c.remaining)}</span>`+
     (unpaid.length?unpaid.map(b=>`<span class="muted">\u2212 ${esc(b.name)} still to pay</span><span class="num muted">${money(b.left)}</span>`).join("")

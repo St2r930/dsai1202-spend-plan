@@ -61,3 +61,10 @@ AI did: shortened stat descriptions, hid $0 split segments, switched SVG from vi
 Problem / what we checked: (1) chart text was requested at 12px twice before but SVG viewBox scaling shrank it — AI hadn't realized the viewBox was downscaling fonts. Fixed by using `width`/`height` attributes instead. (2) "79% budget used" included rent paid on day 1, contradicting the chart note "you spent less than planned". Changed pace to track daily categories only vs daily budget. (3) Previous fixes (nowrap on stats) caused a new overlap — this round AI checked screenshots before reporting done.
 What we decided and why: (Petr to fill)
 Lesson: (Petr to fill)
+
+## 2026-10-26 · Petr · Claude Code
+Asked AI to: verify all v0.7 fixes actually work by taking Playwright screenshots and measuring elements, then fix anything still broken.
+AI did: took screenshots at 1280px and 390px (light+dark). Ran programmatic checks: (1) stats — no overlap, no clipping. (2) chart labels — font-size 12, rendered 15px bounding box — confirmed readable. (3) messages — "61% daily budget used" < "84% month passed" → "on track" → "spent less than planned" — all consistent. (4) split bar — discovered the $0 bills segment was **still 16px wide** because `padding-inline:8px` with `box-sizing:border-box` and `width:0` doesn't collapse to 0. Fixed by using `display:none` when a segment is $0, and hiding text when a segment is <12% wide to prevent stray letters.
+Problem / what we checked: v0.7 claimed to fix $0 segments, but the CSS padding bug meant the bills segment still rendered at 16px despite `width:0`. Playwright `getBoundingClientRect()` caught what visual inspection missed. After the fix, bills segment measured 0px at both viewports.
+What we decided and why: (Petr to fill)
+Lesson: (Petr to fill)

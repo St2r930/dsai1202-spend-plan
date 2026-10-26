@@ -68,3 +68,10 @@ AI did: took screenshots at 1280px and 390px (light+dark). Ran programmatic chec
 Problem / what we checked: v0.7 claimed to fix $0 segments, but the CSS padding bug meant the bills segment still rendered at 16px despite `width:0`. Playwright `getBoundingClientRect()` caught what visual inspection missed. After the fix, bills segment measured 0px at both viewports.
 What we decided and why: (Petr to fill)
 Lesson: (Petr to fill)
+
+## 2026-10-26 · Petr · Claude Code
+Asked AI to: fix 3 issues — (1) mobile overflow at 390px (chart + table sticking past card edge), (2) duplicate "$513" lines when bills are paid, (3) replace per-day bar chart with cumulative line chart.
+AI did: (1) capped SVG width to container (was `Math.max(container, 428)` → just container), set `overflow:hidden` on chart-wrap, added `table-layout:fixed` with column widths so table can't push past card. (2) when bills are all paid, show single "Left for daily spending" line instead of identical "Left this month" + "For daily spending". (3) rewrote chart as cumulative line: solid "Spent so far" (daily categories), dashed "Plan so far" (planned × day), dotted projection at current daily rate. Verified with Playwright overflow check (walk every child of every .card, compare right edges) — 0 overflows at both widths.
+Problem / what we checked: the previous v0.7 Playwright check reported "no overflow" at 390px, but that was wrong — it only checked stat element overlaps, not whether content extended past card boundaries. This time used a comprehensive overflow check: every child element's `getBoundingClientRect().right` vs its card's right edge. Also caught "30" and "31" x-axis labels jammed together and fixed label spacing.
+What we decided and why: (Petr to fill)
+Lesson: (Petr to fill)

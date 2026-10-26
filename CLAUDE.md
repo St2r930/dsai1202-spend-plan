@@ -16,3 +16,10 @@ suggestion, something was hard, or you did something surprisingly fast.
   Never write lessons for the user.
 - Include the commit hash if there is one.
 - Do not log routine tasks that went smoothly.
+
+## Screenshot rule
+- Do NOT take screenshots on your own initiative.
+- Take them only when I ask, or ONCE at the very end of a task that
+  changed how the page looks.
+- Always run Playwright in headless mode, so no windows appear on my screen.
+- Save them to docs/screenshots/<version>/ as before.

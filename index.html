@@ -109,6 +109,7 @@ details summary{cursor:pointer;font-family:var(--f-display);font-weight:600;font
 .period-hint{font-size:13px;color:var(--muted);background:var(--bg);border-radius:8px;padding:8px 12px}
 .period-grid{display:grid;grid-template-columns:1fr 80px 1fr;gap:8px;align-items:end}
 .period-grid label{min-width:0}
+@media (max-width:599px){.period-grid{grid-template-columns:1fr;gap:10px}.period-grid label{width:100%}}
 .period-summary{font-size:13px;color:var(--muted);margin-top:2px}
 </style>
 </head>
@@ -443,8 +444,8 @@ function render(){
   const rows=periodLog().map((e,i)=>({e,i:S.log.indexOf(e)})).sort((a,b)=>b.e.date.localeCompare(a.e.date));
   $("logBody").innerHTML=rows.map(({e,i})=>{
     const d=parseISO(e.date);
-    const dayLabel=`${d.getDate()} ${d.toLocaleString("en-US",{month:"short"})}`;
-    return `<tr><td class="num muted" style="width:52px">${dayLabel}</td><td>${esc(e.desc)}<div class="small muted">${esc(e.cat)}</div></td><td class="r num" style="width:68px">${money(e.amt)}</td><td class="r" style="width:32px"><button class="ghost tiny" type="button" data-del="${i}" aria-label="Delete">\u2715</button></td></tr>`;
+    const dayLabel=`${d.getDate()}\u00A0${d.toLocaleString("en-US",{month:"short"})}`;
+    return `<tr><td class="muted small" style="width:56px;white-space:nowrap">${dayLabel}</td><td>${esc(e.desc)}<div class="small muted">${esc(e.cat)}</div></td><td class="r num" style="width:68px">${money(e.amt)}</td><td class="r" style="width:32px"><button class="ghost tiny" type="button" data-del="${i}" aria-label="Delete">\u2715</button></td></tr>`;
   }).join("")||`<tr><td class="muted" colspan="4">Nothing added yet.</td></tr>`;
 
   // setup fields
@@ -528,10 +529,20 @@ $("addForm").addEventListener("submit",ev=>{ev.preventDefault();
   $("amt").value="";$("desc").value="";save();render();});
 
 /* ---- Cumulative spending chart (SVG) ---- */
-function niceMax(v){
-  if(v<=0)return 100;
-  const step=v<=200?50:v<=500?100:v<=1000?200:v<=2000?500:500;
-  return Math.ceil(v/step)*step;
+function niceStep(maxVal,maxTicks){
+  if(maxVal<=0) return {step:50,ceil:maxTicks*50};
+  const raw=maxVal/maxTicks;
+  const mag=Math.pow(10,Math.floor(Math.log10(raw)));
+  const nice=[1,2,2.5,5,10];
+  let step=nice.find(n=>n*mag>=raw)*mag;
+  return {step,ceil:Math.ceil(maxVal/step)*step};
+}
+function fmtDollar(v){
+  if(v>=1000){
+    const k=v/1000;
+    return "$"+(k%1===0?k:k.toFixed(1))+"k";
+  }
+  return "$"+v;
 }
 function renderChart(){
   const DAYS=periodDays();
@@ -556,17 +567,21 @@ function renderChart(){
   const actualDays=periodNotStarted()?0:Math.min(todayIdx+1,DAYS);
   const cumProject=[];
   if(!periodHasEnded()&&actualDays<DAYS){
-    for(let i=actualDays;i<DAYS;i++) cumProject.push(cumActual[actualDays-1]+currentDaily*(i-actualDays+1));
+    const base=actualDays>0?cumActual[actualDays-1]:0;
+    for(let i=actualDays;i<DAYS;i++) cumProject.push(base+currentDaily*(i-actualDays+1));
   }
 
-  const maxVal=Math.max(cumPlan[DAYS-1]||0,cumActual[actualDays-1]||0+(cumProject.length?cumProject[cumProject.length-1]-(cumActual[actualDays-1]||0):0),1);
-  const ceilMax=niceMax(maxVal*1.1);
+  const actualMax=actualDays>0?cumActual[actualDays-1]:0;
+  const projMax=cumProject.length?cumProject[cumProject.length-1]:0;
+  const maxVal=Math.max(cumPlan[DAYS-1]||0,actualMax,projMax,1);
+  const {step:yStep,ceil:ceilMax}=niceStep(maxVal*1.1,5);
   const cs=getComputedStyle(document.documentElement);
   const accent=cs.getPropertyValue("--accent").trim();
   const muted=cs.getPropertyValue("--muted").trim();
   const linec=cs.getPropertyValue("--line").trim();
   const containerW=$("chartWrap").clientWidth||500;
-  const LEFT=48,RIGHT=12,TOP=12,BOT=36;
+  const yLabelW=ceilMax>=100000?56:ceilMax>=10000?52:ceilMax>=1000?44:40;
+  const LEFT=yLabelW+6,RIGHT=12,TOP=12,BOT=36;
   const W=containerW;
   const H=220;
   const plotW=W-LEFT-RIGHT,plotH=H-TOP-BOT;
@@ -574,17 +589,19 @@ function renderChart(){
   const cy=v=>TOP+plotH-plotH*(Math.min(v,ceilMax)/ceilMax);
   const FONT=`font-family="var(--f-num)"`;
   let svg=`<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" role="img" aria-label="Cumulative spending chart" style="cursor:default">`;
-  // y-axis
-  const yStep=ceilMax<=200?50:ceilMax<=500?100:ceilMax<=1000?200:500;
+  // y-axis (max ~6 labels)
   for(let v=0;v<=ceilMax;v+=yStep){
     const y=cy(v);
     svg+=`<line x1="${LEFT}" y1="${y}" x2="${W-RIGHT}" y2="${y}" stroke="${linec}" stroke-width="0.5"/>`;
-    svg+=`<text x="${LEFT-6}" y="${y+4}" fill="${muted}" font-size="12" ${FONT} text-anchor="end">$${v}</text>`;
+    svg+=`<text x="${LEFT-6}" y="${y+4}" fill="${muted}" font-size="12" ${FONT} text-anchor="end">${fmtDollar(v)}</text>`;
   }
-  // plan line
+  // plan line (always draw if budget > bills, even for future/empty periods)
   if(plannedDaily>0){
     let pts="";for(let i=0;i<DAYS;i++) pts+=(i?'L':'M')+`${cx(i)},${cy(cumPlan[i])}`;
     svg+=`<path d="${pts}" fill="none" stroke="${muted}" stroke-width="1.5" stroke-dasharray="5,3"/>`;
+  } else if(DAYS>0){
+    // still draw $0 baseline
+    svg+=`<line x1="${LEFT}" y1="${cy(0)}" x2="${W-RIGHT}" y2="${cy(0)}" stroke="${muted}" stroke-width="1.5" stroke-dasharray="5,3"/>`;
   }
   // actual spent line
   if(actualDays>=1){
@@ -594,23 +611,45 @@ function renderChart(){
   }
   // projection
   if(cumProject.length>0){
-    let pts=`M${cx(actualDays-1)},${cy(cumActual[actualDays-1])}`;
+    const projBase=actualDays>0?cumActual[actualDays-1]:0;
+    const startIdx=Math.max(0,actualDays-1);
+    let pts=`M${cx(startIdx)},${cy(projBase)}`;
     for(let i=0;i<cumProject.length;i++) pts+=`L${cx(actualDays+i)},${cy(cumProject[i])}`;
     svg+=`<path d="${pts}" fill="none" stroke="${accent}" stroke-width="1.5" stroke-dasharray="3,4" opacity="0.5"/>`;
   }
-  // x-axis: real dates
-  const labelEvery=DAYS<=8?1:DAYS<=16?2:DAYS<=23?3:5;
-  for(let i=0;i<DAYS;i++){
-    const d=addDays(pStart,i);
-    const isToday=toISO(d)===TODAY_ISO;
-    const isRegular=(i%labelEvery===0)||i===0||i===DAYS-1;
-    if(!isToday&&isRegular&&todayIdx>=0&&Math.abs(i-todayIdx)<=2)continue;
-    if(!isToday&&isRegular&&DAYS-1-i>0&&DAYS-1-i<labelEvery)continue;
-    const show=isToday||isRegular;
-    if(show){
+  // x-axis: adaptive date labels — never overlapping
+  const LBL_W=48; // approx width of "Oct 29" label in px
+  const GAP=6;
+  // How many labels can fit?
+  const maxLabels=Math.max(2,Math.floor(plotW/(LBL_W+GAP)));
+  // Build candidate list: priority order (first, today, last, then evenly spaced)
+  const candidates=[];
+  candidates.push({i:0,pri:0});
+  if(todayIdx>=0&&todayIdx<DAYS&&todayIdx!==0&&todayIdx!==DAYS-1) candidates.push({i:todayIdx,pri:1});
+  candidates.push({i:DAYS-1,pri:2});
+  // Evenly spaced labels — interval adapts to period length and chart width
+  const targetCount=Math.min(maxLabels,DAYS);
+  const interval=Math.max(1,Math.ceil(DAYS/targetCount));
+  for(let i=interval;i<DAYS-1;i+=interval) candidates.push({i,pri:3});
+  candidates.sort((a,b2)=>a.pri-b2.pri);
+  // Place labels greedily, checking for overlap
+  const placedBounds=[];
+  const LBL_HALF=LBL_W/2;
+  function labelBounds(idx){
+    const px=cx(idx);
+    if(idx===0) return [px,px+LBL_W];
+    if(idx===DAYS-1) return [px-LBL_W,px];
+    return [px-LBL_HALF,px+LBL_HALF];
+  }
+  for(const c of candidates){
+    const [l,r]=labelBounds(c.i);
+    if(placedBounds.every(([pl,pr])=>l>=pr+GAP||r<=pl-GAP)){
+      placedBounds.push([l,r]);
+      const d=addDays(pStart,c.i);
+      const isToday=todayIdx>=0&&c.i===todayIdx;
       const lbl=fmtShort(d);
-      const anchor=i===0?"start":i===DAYS-1?"end":"middle";
-      svg+=`<text x="${cx(i)}" y="${H-BOT+15}" fill="${isToday?accent:muted}" font-size="10" font-weight="${isToday?'600':'400'}" ${FONT} text-anchor="${anchor}">${lbl}</text>`;
+      const anchor=c.i===0?"start":c.i===DAYS-1?"end":"middle";
+      svg+=`<text x="${cx(c.i)}" y="${H-BOT+15}" fill="${isToday?accent:muted}" font-size="10" font-weight="${isToday?'600':'400'}" ${FONT} text-anchor="${anchor}">${lbl}</text>`;
     }
   }
   svg+=`<text x="${LEFT+plotW/2}" y="${H-4}" fill="${muted}" font-size="12" font-family="var(--f-body)" text-anchor="middle">${fmtShort(pStart)} \u2013 ${fmtShort(pEnd)}</text>`;

@@ -67,7 +67,7 @@ h2{font-family:var(--f-display);font-weight:600;font-size:1.1rem;margin:0}
 label{display:grid;gap:4px;font-size:13px;color:var(--muted);white-space:nowrap}
 input,select{font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:9px 10px;width:100%;min-width:0}
 input:focus-visible,select:focus-visible,button:focus-visible,summary:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
-.addrow{display:grid;grid-template-columns:110px 1fr;gap:10px}
+.addrow{display:grid;grid-template-columns:140px 1fr;gap:10px}
 .addrow .wide{grid-column:1/-1}
 button{font:inherit;font-weight:600;border:0;border-radius:8px;padding:10px 14px;cursor:pointer;background:var(--accent);color:var(--surface)}
 button:disabled{opacity:.45;cursor:not-allowed}
@@ -246,15 +246,17 @@ function defaultPeriod(){
 }
 
 function example(){
-  // 30-day period that started 28 days ago so there is history and 2 days left
-  const startD=addDays(NOW,-28);
-  const p={start:toISO(startD), days:30};
+  // Use the current calendar month so "This calendar month" matches
+  const y=NOW.getFullYear(),m=NOW.getMonth();
+  const startD=new Date(y,m,1);
+  const monthDays=new Date(y,m+1,0).getDate();
+  const p={start:toISO(startD), days:monthDays};
+  const todayDay=NOW.getDate();
   const d=n=>{
-    // day n (1-based) within the period, clamped to days already passed
-    const target=addDays(startD,Math.max(0,Math.min(27,n-1)));
-    return toISO(target);
+    const day=Math.max(1,Math.min(todayDay,n));
+    return toISO(new Date(y,m,day));
   };
-  const yesterday=27; // day index of yesterday within period
+  const yesterday=Math.max(1,todayDay-1);
   const meals=[
     {desc:"Groceries",cat:"Food"},{desc:"Canteen lunch",cat:"Food"},
     {desc:"Dinner out",cat:"Food"},{desc:"Snacks",cat:"Food"},
@@ -268,7 +270,7 @@ function example(){
     {date:d(Math.min(15,yesterday)),desc:"Octopus top-up",cat:"Transport",amt:155}
   ];
   const amounts=[37,67,29,53,41,61,43,59,31,71,47,23,73,19,83,17,79,13,89,11];
-  for(let day=1,ai=0;day<=yesterday;day++){
+  for(let day=2,ai=0;day<=yesterday;day++){
     if(day%2===0||amounts[ai%amounts.length]%3===0){
       const ml=meals[ai%meals.length];
       log.push({date:d(day),desc:ml.desc,cat:ml.cat,amt:30+amounts[ai%amounts.length]%50});
@@ -376,7 +378,7 @@ function render(){
   $("futureBanner").hidden=!future||isExample();
   if(future) $("futureDate").textContent=fmtShort(pStart);
   // title
-  $("mainTitle").textContent=ended?"Your period has ended.":future?`Your period starts on ${fmtShort(pStart)}.`:"Here is how to finish the period.";
+  $("mainTitle").textContent=ended?"Your period has ended.":"Here is how to finish the period.";
   // stats
   $("stats").innerHTML=
     `<div class="stat"><span class="k">Budget</span><span class="v">${money(S.budget)}</span><span class="d">${fmtShort(pStart)}\u2013${fmtShort(pEnd)}</span></div>`+
@@ -400,7 +402,7 @@ function render(){
 
   const nx=$("nextAction");nx.classList.toggle("alert",c.forDaily<0);
   if(ended) nx.innerHTML=`<b>Period ended.</b> Open Setup to start a new period.`;
-  else if(future) nx.innerHTML=`Your period starts on <b>${fmtShort(pStart)}</b>. Set your budget and bills in Setup below.`;
+  else if(future) nx.innerHTML=S.budget>0?`You can spend <b>${money(c.daily)}/day</b> once your period starts.`:`Set your budget and bills in Setup below.`;
   else if(c.forDaily<0) nx.innerHTML=`<b>Your bills are at risk.</b> You are ${money(-c.forDaily)} short. Stop non-essential spending.`;
   else if(up>tp+5) nx.innerHTML=`You've used <b>${up}% of your daily budget</b> in <b>${tp}% of the period</b>. Stay under <b>${money(c.daily)}/day</b> to stay on track.`;
   else nx.innerHTML=`You're on track. Stay under <b>${money(c.daily)}/day</b> and you'll finish the period with money for every bill.`;
@@ -426,7 +428,8 @@ function render(){
   // add form: date field bounds
   $("addDate").min=S.period.start;
   $("addDate").max=toISO(pEnd);
-  if(!$("addDate").value){
+  const curDate=$("addDate").value;
+  if(!curDate||curDate<S.period.start||curDate>toISO(pEnd)){
     $("addDate").value=todayInPeriod()?TODAY_ISO:S.period.start;
   }
 
@@ -601,12 +604,13 @@ function renderChart(){
     const d=addDays(pStart,i);
     const isToday=toISO(d)===TODAY_ISO;
     const isRegular=(i%labelEvery===0)||i===0||i===DAYS-1;
-    if(!isToday&&isRegular&&Math.abs(i-todayIdx)<=1)continue;
-    if(!isToday&&i!==DAYS-1&&isRegular&&DAYS-1-i<labelEvery)continue;
+    if(!isToday&&isRegular&&todayIdx>=0&&Math.abs(i-todayIdx)<=2)continue;
+    if(!isToday&&isRegular&&DAYS-1-i>0&&DAYS-1-i<labelEvery)continue;
     const show=isToday||isRegular;
     if(show){
       const lbl=fmtShort(d);
-      svg+=`<text x="${cx(i)}" y="${H-BOT+15}" fill="${isToday?accent:muted}" font-size="10" font-weight="${isToday?'600':'400'}" ${FONT} text-anchor="middle">${lbl}</text>`;
+      const anchor=i===0?"start":i===DAYS-1?"end":"middle";
+      svg+=`<text x="${cx(i)}" y="${H-BOT+15}" fill="${isToday?accent:muted}" font-size="10" font-weight="${isToday?'600':'400'}" ${FONT} text-anchor="${anchor}">${lbl}</text>`;
     }
   }
   svg+=`<text x="${LEFT+plotW/2}" y="${H-4}" fill="${muted}" font-size="12" font-family="var(--f-body)" text-anchor="middle">${fmtShort(pStart)} \u2013 ${fmtShort(pEnd)}</text>`;

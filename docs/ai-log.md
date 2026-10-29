@@ -75,3 +75,10 @@ AI did: (1) capped SVG width to container (was `Math.max(container, 428)` → ju
 Problem / what we checked: the previous v0.7 Playwright check reported "no overflow" at 390px, but that was wrong — it only checked stat element overlaps, not whether content extended past card boundaries. This time used a comprehensive overflow check: every child element's `getBoundingClientRect().right` vs its card's right edge. Also caught "30" and "31" x-axis labels jammed together and fixed label spacing.
 What we decided and why: (Petr to fill)
 Lesson: (Petr to fill)
+
+## 2026-10-29 · Petr · Claude Code
+Asked AI to: build v0.9 — flexible budget period (replace hard-coded calendar month with user-defined start date + length).
+AI did: near-complete rewrite of JS logic. Added period settings (start/end/days pickers, quick buttons for 7/14/30/this month), date field on "Add spending", chart x-axis with real dates, period-ended banner. Renamed all "monthly" labels to "period". Migrated bill data format (`monthly` → `amt`). Added period to CSV export/import.
+Problem / what we checked: First attempt reported the task as done but skipped several items from the spec: (1) no handling for future periods (negative days, wrong title), (2) chart used ambiguous d/m date format instead of "1 Nov", (3) example data used calendar month instead of 30-day period, (4) no .gitignore, (5) testing-plan.md dates not updated, (6) v0.8 migration not tested. Petr caught all six in review. Second pass fixed all: added future-period banner/state, changed chart labels to "Oct 1" format, switched example to 30-day period, added `.gitignore`, updated testing plan to 1–6 Nov, and tested migration from v0.8 localStorage format. Also found CSS `display:flex` overriding HTML `hidden` attribute on all banners — fixed with `[hidden]{display:none!important}`.
+What we decided and why: (Petr to fill)
+Lesson: (Petr to fill)

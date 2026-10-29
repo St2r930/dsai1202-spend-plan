@@ -8,7 +8,6 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap">
 <style>
-/* Layout: one narrow column like a phone app — today's limit, add spending, where the money goes, history, setup. */
 :root{
   --bg:#eef1f5; --surface:#ffffff; --ink:#152033; --muted:#5b6678; --line:#d5dbe4;
   --accent:#2f4fd8; --accent-soft:#e3e8fc;
@@ -101,17 +100,23 @@ details summary{cursor:pointer;font-family:var(--f-display);font-weight:600;font
 .chart-legend span{display:flex;align-items:center;gap:4px}
 .chart-legend i{display:inline-block;width:10px;height:10px;border-radius:2px;flex-shrink:0}
 .banner{background:var(--warn-soft);border:1px solid var(--warn);border-radius:10px;padding:12px 16px;display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;font-size:14px}
+[hidden]{display:none !important}
 .banner b{color:var(--warn)}
 .banner button{font-size:13px;padding:6px 14px}
 .explainer{font-size:13px;color:var(--muted);cursor:pointer;border:0;background:0;padding:0;font-family:inherit;text-decoration:underline;text-decoration-style:dotted;text-underline-offset:2px}
 .explainer-text{font-size:13px;color:var(--muted);background:var(--bg);border-radius:8px;padding:10px 12px;margin-top:4px}
+.period-quick{display:flex;flex-wrap:wrap;gap:6px}
+.period-hint{font-size:13px;color:var(--muted);background:var(--bg);border-radius:8px;padding:8px 12px}
+.period-grid{display:grid;grid-template-columns:1fr 80px 1fr;gap:8px;align-items:end}
+.period-grid label{min-width:0}
+.period-summary{font-size:13px;color:var(--muted);margin-top:2px}
 </style>
 </head>
 <body>
 
 <div class="wrap">
   <header>
-    <div><span class="tag">DSAI1202 · PROTOTYPE v0.8</span><h1 class="title">Here is how to finish the month.</h1></div>
+    <div><span class="tag">DSAI1202 · PROTOTYPE v0.9</span><h1 class="title" id="mainTitle">Here is how to finish the period.</h1></div>
     <div class="btn-row">
       <button class="ghost tiny" id="exportBtn" type="button">Export CSV</button>
       <button class="ghost tiny" id="importBtn" type="button">Import CSV</button>
@@ -125,6 +130,15 @@ details summary{cursor:pointer;font-family:var(--f-display);font-weight:600;font
     <button type="button" id="setupMyBtn">Set up my budget</button>
   </div>
 
+  <div class="banner" id="endedBanner" hidden>
+    <span><b>Your period ended</b> — start a new one to keep tracking.</span>
+    <button type="button" id="newPeriodBtn">Start a new period</button>
+  </div>
+
+  <div class="banner" id="futureBanner" hidden>
+    <span><b>Your period starts on <span id="futureDate"></span></b> — nothing to track yet.</span>
+  </div>
+
   <div class="layout">
   <div class="col">
   <!-- 1. TODAY -->
@@ -136,7 +150,7 @@ details summary{cursor:pointer;font-family:var(--f-display);font-weight:600;font
     <div id="explainerWrap"></div>
     <div class="pace">
       <div class="pace-row"><span>Daily budget used</span><div class="track"><div class="fill" id="usedBar"></div></div><span class="num" id="usedPct"></span></div>
-      <div class="pace-row"><span>Month passed</span><div class="track"><div class="fill time" id="timeBar"></div></div><span class="num" id="timePct"></span></div>
+      <div class="pace-row"><span>Period passed</span><div class="track"><div class="fill time" id="timeBar"></div></div><span class="num" id="timePct"></span></div>
     </div>
     <div class="next" id="nextAction"></div>
   </section>
@@ -145,8 +159,9 @@ details summary{cursor:pointer;font-family:var(--f-display);font-weight:600;font
   <section class="card" aria-labelledby="addH">
     <h2 id="addH">Add spending</h2>
     <form id="addForm" class="addrow">
+      <label>Date<input id="addDate" type="date"></label>
       <label>Amount $<input id="amt" type="number" min="0.01" step="0.01" inputmode="decimal"></label>
-      <label>What for<input id="desc" type="text" placeholder="e.g. Lunch, new jacket"></label>
+      <label class="wide">What for<input id="desc" type="text" placeholder="e.g. Lunch, new jacket"></label>
       <label class="wide">Category<select id="cat"></select></label>
       <div class="preview wide" id="preview"><span class="pill fit">Tip</span><span class="txt">Type an amount to see how it changes your daily limit before you add it.</span></div>
       <button type="submit" class="wide" id="addBtn" disabled>Add</button>
@@ -157,14 +172,14 @@ details summary{cursor:pointer;font-family:var(--f-display);font-weight:600;font
   <div class="col">
   <!-- 3. WHERE THE MONEY GOES -->
   <section class="card" aria-labelledby="planH">
-    <h2 id="planH">Rest of the month</h2>
+    <h2 id="planH">Rest of this period</h2>
     <div class="split" aria-hidden="true"><div class="r" id="splitR"></div><div class="f" id="splitF"></div></div>
     <div class="kv" id="planKv"></div>
   </section>
 
   <!-- 4. HISTORY -->
   <section class="card" aria-labelledby="logH">
-    <h2 id="logH">This month's spending</h2>
+    <h2 id="logH">Spending this period</h2>
     <div style="position:relative">
       <div class="chart-wrap" id="chartWrap"></div>
       <div class="chart-tip" id="chartTip"></div>
@@ -179,11 +194,27 @@ details summary{cursor:pointer;font-family:var(--f-display);font-weight:600;font
   <!-- 5. SETUP -->
   <section class="card">
     <details>
-      <summary>Setup: budget and bills</summary>
+      <summary>Setup: budget, period, and bills</summary>
       <div style="display:grid;gap:14px;margin-top:12px">
-        <label>Monthly budget $<input id="sBudget" type="number" min="0" step="1"></label>
         <div style="display:grid;gap:8px">
-          <div class="small muted">Bills: fixed monthly costs the app sets aside before working out your daily limit.</div>
+          <div class="small" style="font-weight:600">Budget period</div>
+          <div class="period-grid">
+            <label>Start date<input id="pStart" type="date"></label>
+            <label>Days<input id="pDays" type="number" min="1" max="366" step="1"></label>
+            <label>End date<input id="pEnd" type="date"></label>
+          </div>
+          <div class="period-summary" id="periodSummary"></div>
+          <div class="period-quick">
+            <button class="ghost tiny" type="button" id="pMonth">This calendar month</button>
+            <button class="ghost tiny" type="button" id="p7">7 days</button>
+            <button class="ghost tiny" type="button" id="p14">14 days</button>
+            <button class="ghost tiny" type="button" id="p30">30 days</button>
+          </div>
+        </div>
+        <label>Budget for this period $<input id="sBudget" type="number" min="0" step="1"></label>
+        <div class="period-hint" id="periodHint"></div>
+        <div style="display:grid;gap:8px">
+          <div class="small muted">Bills due in this period: fixed costs the app sets aside before working out your daily limit.</div>
           <div id="billList" style="display:grid;gap:8px"></div>
           <div><button class="ghost tiny" type="button" id="addBill">+ Add bill</button></div>
         </div>
@@ -196,18 +227,34 @@ details summary{cursor:pointer;font-family:var(--f-display);font-weight:600;font
 const KEY="spendplan.v2";
 const DAILY_CATS=["Food","Fun","Clothes","Other"];
 
-/* Today, from the calendar. The budget month is the current calendar month. */
 const NOW=new Date();
-const Y=NOW.getFullYear(), M=NOW.getMonth();
-const TODAY=NOW.getDate();
-const DAYS=new Date(Y,M+1,0).getDate();
-const MONTH_KEY=`${Y}-${String(M+1).padStart(2,"0")}`;
-const dateOf=d=>`${MONTH_KEY}-${String(d).padStart(2,"0")}`;
+const TODAY_ISO=`${NOW.getFullYear()}-${String(NOW.getMonth()+1).padStart(2,"0")}-${String(NOW.getDate()).padStart(2,"0")}`;
+
+/* ---- Date helpers ---- */
+function toISO(d){ return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; }
+function parseISO(s){ const [y,m,d]=s.split("-").map(Number); return new Date(y,m-1,d); }
+function addDays(d,n){ const r=new Date(d); r.setDate(r.getDate()+n); return r; }
+function daysBetween(a,b){ return Math.round((b-a)/864e5); }
+function fmtShort(d){ return d.toLocaleDateString("en-US",{day:"numeric",month:"short"}); }
+function fmtRange(start,end,days){
+  return `${fmtShort(start)} \u2013 ${fmtShort(end)} (${days} day${days!==1?"s":""})`;
+}
+
+/* ---- State ---- */
+function defaultPeriod(){
+  return { start:TODAY_ISO, days:30 };
+}
 
 function example(){
-  const d=n=>dateOf(Math.max(1,Math.min(TODAY,n)));
-  const yesterday=Math.max(1,TODAY-1);
-  // daily spending items spread across the month so the chart looks realistic
+  // 30-day period that started 28 days ago so there is history and 2 days left
+  const startD=addDays(NOW,-28);
+  const p={start:toISO(startD), days:30};
+  const d=n=>{
+    // day n (1-based) within the period, clamped to days already passed
+    const target=addDays(startD,Math.max(0,Math.min(27,n-1)));
+    return toISO(target);
+  };
+  const yesterday=27; // day index of yesterday within period
   const meals=[
     {desc:"Groceries",cat:"Food"},{desc:"Canteen lunch",cat:"Food"},
     {desc:"Dinner out",cat:"Food"},{desc:"Snacks",cat:"Food"},
@@ -220,58 +267,92 @@ function example(){
     {date:d(8),desc:"Concert ticket",cat:"Fun",amt:120},
     {date:d(Math.min(15,yesterday)),desc:"Octopus top-up",cat:"Transport",amt:155}
   ];
-  // add a food/fun item every 1–2 days up to yesterday
-  const rng=n=>[37,67,29,53,41,61,43,59,31,71,47,23,73,19,83,17,79,13,89,11];
-  const amounts=rng();
+  const amounts=[37,67,29,53,41,61,43,59,31,71,47,23,73,19,83,17,79,13,89,11];
   for(let day=1,ai=0;day<=yesterday;day++){
     if(day%2===0||amounts[ai%amounts.length]%3===0){
-      const m=meals[ai%meals.length];
-      log.push({date:d(day),desc:m.desc,cat:m.cat,amt:30+amounts[ai%amounts.length]%50});
+      const ml=meals[ai%meals.length];
+      log.push({date:d(day),desc:ml.desc,cat:ml.cat,amt:30+amounts[ai%amounts.length]%50});
       ai++;
     }
   }
-  return {budget:3000,
-    bills:[{name:"Rent",monthly:1200},{name:"Transport",monthly:310},{name:"Phone & internet",monthly:185}],
+  return {budget:3000, period:p,
+    bills:[{name:"Rent",amt:1200},{name:"Transport",amt:310},{name:"Phone & internet",amt:185}],
     log};
 }
 let S;
-function load(){try{const r=localStorage.getItem(KEY);if(r){S=JSON.parse(r);return}}catch(e){}S=example()}
+function load(){
+  try{
+    const r=localStorage.getItem(KEY);
+    if(r){
+      S=JSON.parse(r);
+      // migrate from old format: monthly -> amt, add period
+      if(!S.period) S.period=defaultPeriod();
+      S.bills.forEach(b=>{ if(b.monthly!==undefined&&b.amt===undefined){b.amt=b.monthly;delete b.monthly} });
+      return;
+    }
+  }catch(e){}
+  S=example();
+}
 function save(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
 const $=id=>document.getElementById(id);
-const money=n=>(n<0?"−$":"$")+Math.abs(Math.round(n)).toLocaleString("en-US");
+const money=n=>(n<0?"\u2212$":"$")+Math.abs(Math.round(n)).toLocaleString("en-US");
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
-const monthLog=()=>S.log.filter(e=>e.date.startsWith(MONTH_KEY));
 
-/* ---- The core calculation. The team must understand and check this. ----
-   remaining  = budget - everything spent this month
-   billsLeft  = for each bill: monthly amount - already paid (never below 0)
-   forDaily   = remaining - billsLeft      (food, fun, clothes, everything else)
-   daysLeft   = days left in the month, counting today
-   daily      = forDaily / daysLeft                                          */
-function compute(log=monthLog()){
-  const spent=log.reduce((a,e)=>a+e.amt,0);
-  const remaining=S.budget-spent;
-  const daysLeft=DAYS-TODAY+1;
-  const bills=S.bills.map(b=>{const paid=log.filter(x=>x.cat===b.name).reduce((a,x)=>a+x.amt,0);return {...b,paid,left:Math.max(0,b.monthly-paid)}});
-  const billsLeft=bills.reduce((a,b)=>a+b.left,0);
-  const forDaily=remaining-billsLeft;
-  return {spent,remaining,daysLeft,bills,billsLeft,forDaily,daily:forDaily/daysLeft,
-    usedShare:S.budget?spent/S.budget:0,timeShare:TODAY/DAYS};
+/* ---- Period helpers ---- */
+function periodStart(){ return parseISO(S.period.start); }
+function periodEnd(){ return addDays(periodStart(), S.period.days-1); }
+function periodDays(){ return S.period.days; }
+function periodLog(){
+  const s=S.period.start;
+  const e=toISO(periodEnd());
+  return S.log.filter(x=>x.date>=s&&x.date<=e);
+}
+function dayIndex(dateStr){
+  return daysBetween(periodStart(), parseISO(dateStr));
+}
+function periodHasEnded(){
+  return TODAY_ISO > toISO(periodEnd());
+}
+function periodNotStarted(){
+  return TODAY_ISO < S.period.start;
+}
+function todayInPeriod(){
+  return TODAY_ISO >= S.period.start && TODAY_ISO <= toISO(periodEnd());
+}
+function todayDayIndex(){
+  if(TODAY_ISO < S.period.start) return -1;
+  if(TODAY_ISO > toISO(periodEnd())) return S.period.days;
+  return dayIndex(TODAY_ISO);
 }
 
-/* ---- Verdict for a spending before it is added. ----
-   Placeholder rules (team decision):
-   - within today's daily limit                  -> "Fine"
-   - over it, but daily limit stays >= 70%       -> "OK"
-   - daily limit drops below 70% of what it was  -> "Think twice"
-   - more than the money left for daily spending -> "Can't afford"   */
+/* ---- Core calculation ---- */
+function compute(log=periodLog()){
+  const spent=log.reduce((a,e)=>a+e.amt,0);
+  const remaining=S.budget-spent;
+  const DAYS=periodDays();
+  const ti=todayDayIndex();
+  const daysLeft=periodHasEnded()?0:periodNotStarted()?DAYS:Math.max(1,DAYS-Math.max(0,ti));
+  const daysPassed=periodNotStarted()?0:Math.min(DAYS,Math.max(0,ti+1));
+  const bills=S.bills.map(b=>{
+    const paid=log.filter(x=>x.cat===b.name).reduce((a,x)=>a+x.amt,0);
+    return {...b,paid,left:Math.max(0,b.amt-paid)};
+  });
+  const billsLeft=bills.reduce((a,b)=>a+b.left,0);
+  const forDaily=remaining-billsLeft;
+  return {spent,remaining,daysLeft,daysPassed,totalDays:DAYS,bills,billsLeft,forDaily,
+    daily:daysLeft>0?forDaily/daysLeft:0,
+    usedShare:S.budget?spent/S.budget:0,
+    timeShare:DAYS>0?daysPassed/DAYS:0};
+}
+
+/* ---- Verdict ---- */
 const KEEP_SHARE=0.7;
 function judge(amt,cat){
   const before=compute();
-  const after=compute([...monthLog(),{date:dateOf(TODAY),desc:"",cat,amt}]);
+  const after=compute([...periodLog(),{date:TODAY_ISO,desc:"",cat,amt}]);
   const bill=before.bills.find(b=>b.name===cat);
   if(bill&&amt<=bill.left) return {cls:"ok",label:"Fine",txt:`Paid from the ${money(bill.left)} set aside for ${esc(cat)}. Daily limit stays ${money(before.daily)}.`};
-  if(after.forDaily<0) return {cls:"bad",label:"Can't afford",txt:`You'd be ${money(-after.forDaily)} short for your bills this month.`};
+  if(after.forDaily<0) return {cls:"bad",label:"Can't afford",txt:`You'd be ${money(-after.forDaily)} short for your bills this period.`};
   if(amt<=before.daily) return {cls:"ok",label:"Fine",txt:`Within today's limit. Daily limit becomes ${money(after.daily)}.`};
   if(after.daily>=before.daily*KEEP_SHARE) return {cls:"fit",label:"OK",txt:`Daily limit drops from ${money(before.daily)} to ${money(after.daily)} for ${before.daysLeft} days.`};
   return {cls:"warn",label:"Think twice",txt:`Daily limit drops from ${money(before.daily)} to ${money(after.daily)} for ${before.daysLeft} days.`};
@@ -280,37 +361,49 @@ function judge(amt,cat){
 function isExample(){
   const ex=example();
   return S.budget===ex.budget&&S.bills.length===ex.bills.length&&
-    S.bills.every((b,i)=>b.name===ex.bills[i].name&&b.monthly===ex.bills[i].monthly)&&
+    S.bills.every((b,i)=>b.name===ex.bills[i].name&&b.amt===ex.bills[i].amt)&&
     S.log.length===ex.log.length&&S.log.every((e,i)=>e.desc===ex.log[i].desc&&e.amt===ex.log[i].amt);
 }
 
 function render(){
   const c=compute();
-  const mon=NOW.toLocaleString("en-US",{month:"short"});
-  // example banner
+  const pStart=periodStart(), pEnd=periodEnd();
+  const ended=periodHasEnded();
+  const future=periodNotStarted();
+  // banners
   $("demoBanner").hidden=!isExample();
+  $("endedBanner").hidden=!ended||isExample();
+  $("futureBanner").hidden=!future||isExample();
+  if(future) $("futureDate").textContent=fmtShort(pStart);
+  // title
+  $("mainTitle").textContent=ended?"Your period has ended.":future?`Your period starts on ${fmtShort(pStart)}.`:"Here is how to finish the period.";
+  // stats
   $("stats").innerHTML=
-    `<div class="stat"><span class="k">Budget</span><span class="v">${money(S.budget)}</span><span class="d">${mon} 1–${DAYS}</span></div>`+
-    `<div class="stat"><span class="k">Spent</span><span class="v">${money(c.spent)}</span><span class="d">${TODAY} days</span></div>`+
-    `<div class="stat"><span class="k">To go</span><span class="v">${c.daysLeft} days</span><span class="d">incl. today</span></div>`;
+    `<div class="stat"><span class="k">Budget</span><span class="v">${money(S.budget)}</span><span class="d">${fmtShort(pStart)}\u2013${fmtShort(pEnd)}</span></div>`+
+    `<div class="stat"><span class="k">Spent</span><span class="v">${money(c.spent)}</span><span class="d">${c.daysPassed} days in</span></div>`+
+    `<div class="stat"><span class="k">To go</span><span class="v">${c.daysLeft} days</span><span class="d">${ended?"ended":future?"not started":"incl. today"}</span></div>`;
   $("daily").textContent=money(Math.max(0,c.daily));
-  $("dailySub").textContent=`for food and everything else · ${c.daysLeft} days left in ${NOW.toLocaleString("en-US",{month:"long"})}`;
+  $("dailySub").textContent=ended
+    ?"Period ended"
+    :future?`Period starts ${fmtShort(pStart)}`
+    :`for food and everything else \u00B7 ${c.daysLeft} day${c.daysLeft!==1?"s":""} left`;
   // explainer
-  $("explainerWrap").innerHTML=`<button class="explainer" type="button" id="explainerBtn">How is this calculated?</button><div class="explainer-text" id="explainerBody" hidden>${money(c.remaining)} left − ${money(c.billsLeft)} for bills = ${money(c.forDaily)} for daily spending ÷ ${c.daysLeft} days = <b>${money(Math.max(0,c.daily))}/day</b></div>`;
-  // Pace: compare daily spending (excluding bills) to the daily plan budget,
-  // so paying rent on day 1 doesn't make the pace look bad.
+  $("explainerWrap").innerHTML=`<button class="explainer" type="button" id="explainerBtn">How is this calculated?</button><div class="explainer-text" id="explainerBody" hidden>${money(c.remaining)} left \u2212 ${money(c.billsLeft)} for bills = ${money(c.forDaily)} for daily spending \u00F7 ${c.daysLeft} days = <b>${money(Math.max(0,c.daily))}/day</b></div>`;
+  // Pace
   const billNames=new Set(S.bills.map(b=>b.name));
-  const dailySpent=monthLog().filter(e=>!billNames.has(e.cat)).reduce((a,e)=>a+e.amt,0);
-  const dailyBudget=S.budget-S.bills.reduce((a,b)=>a+b.monthly,0);
+  const dailySpent=periodLog().filter(e=>!billNames.has(e.cat)).reduce((a,e)=>a+e.amt,0);
+  const dailyBudget=S.budget-S.bills.reduce((a,b)=>a+b.amt,0);
   const up=dailyBudget>0?Math.round(dailySpent/dailyBudget*100):0;
   const tp=Math.round(c.timeShare*100);
   $("usedBar").style.width=Math.min(100,up)+"%";$("usedBar").classList.toggle("over",up>tp+5);
   $("usedPct").textContent=up+"%";$("timeBar").style.width=tp+"%";$("timePct").textContent=tp+"%";
 
   const nx=$("nextAction");nx.classList.toggle("alert",c.forDaily<0);
-  if(c.forDaily<0) nx.innerHTML=`<b>Your bills are at risk.</b> You are ${money(-c.forDaily)} short. Stop non-essential spending until the month ends.`;
-  else if(up>tp+5) nx.innerHTML=`You've used <b>${up}% of your daily budget</b> in <b>${tp}% of the month</b>. Stay under <b>${money(c.daily)}/day</b> to stay on track.`;
-  else nx.innerHTML=`You're on track. Stay under <b>${money(c.daily)}/day</b> and you'll finish the month with money for every bill.`;
+  if(ended) nx.innerHTML=`<b>Period ended.</b> Open Setup to start a new period.`;
+  else if(future) nx.innerHTML=`Your period starts on <b>${fmtShort(pStart)}</b>. Set your budget and bills in Setup below.`;
+  else if(c.forDaily<0) nx.innerHTML=`<b>Your bills are at risk.</b> You are ${money(-c.forDaily)} short. Stop non-essential spending.`;
+  else if(up>tp+5) nx.innerHTML=`You've used <b>${up}% of your daily budget</b> in <b>${tp}% of the period</b>. Stay under <b>${money(c.daily)}/day</b> to stay on track.`;
+  else nx.innerHTML=`You're on track. Stay under <b>${money(c.daily)}/day</b> and you'll finish the period with money for every bill.`;
 
   const tot=Math.max(1,c.billsLeft+Math.max(0,c.forDaily));
   const showBills=c.billsLeft>0,showDaily=c.forDaily>0;
@@ -322,12 +415,19 @@ function render(){
   $("splitF").style.width=dailyPct+"%";$("splitF").textContent=dailyPct>12?("Daily "+money(Math.max(0,c.forDaily))):"";
   const unpaid=c.bills.filter(b=>b.left>0);
   if(unpaid.length){
-    $("planKv").innerHTML=`<span>Left this month</span><span class="num">${money(c.remaining)}</span>`+
+    $("planKv").innerHTML=`<span>Left this period</span><span class="num">${money(c.remaining)}</span>`+
       unpaid.map(b=>`<span class="muted">\u2212 ${esc(b.name)} still to pay</span><span class="num muted">${money(b.left)}</span>`).join("")+
       `<span class="total">For daily spending</span><span class="num total">${money(c.forDaily)}</span>`;
   } else {
     $("planKv").innerHTML=`<span class="total">Left for daily spending</span><span class="num total">${money(c.forDaily)}</span>`+
       (S.bills.length?`<span class="muted">All bills paid \u2713</span><span></span>`:``);
+  }
+
+  // add form: date field bounds
+  $("addDate").min=S.period.start;
+  $("addDate").max=toISO(pEnd);
+  if(!$("addDate").value){
+    $("addDate").value=todayInPeriod()?TODAY_ISO:S.period.start;
   }
 
   const cur=$("cat").value;
@@ -337,11 +437,21 @@ function render(){
   if(!cats.includes(cur))$("cat").value="Food";
   renderPreview();
 
-  const rows=monthLog().map((e,i)=>({e,i:S.log.indexOf(e)})).sort((a,b)=>b.e.date.localeCompare(a.e.date));
-  $("logBody").innerHTML=rows.map(({e,i})=>`<tr><td class="num muted" style="width:28px">${+e.date.slice(8)}</td><td>${esc(e.desc)}<div class="small muted">${esc(e.cat)}</div></td><td class="r num" style="width:68px">${money(e.amt)}</td><td class="r" style="width:32px"><button class="ghost tiny" type="button" data-del="${i}" aria-label="Delete">✕</button></td></tr>`).join("")||`<tr><td class="muted" colspan="4">Nothing added this month yet.</td></tr>`;
+  const rows=periodLog().map((e,i)=>({e,i:S.log.indexOf(e)})).sort((a,b)=>b.e.date.localeCompare(a.e.date));
+  $("logBody").innerHTML=rows.map(({e,i})=>{
+    const d=parseISO(e.date);
+    const dayLabel=`${d.getDate()} ${d.toLocaleString("en-US",{month:"short"})}`;
+    return `<tr><td class="num muted" style="width:52px">${dayLabel}</td><td>${esc(e.desc)}<div class="small muted">${esc(e.cat)}</div></td><td class="r num" style="width:68px">${money(e.amt)}</td><td class="r" style="width:32px"><button class="ghost tiny" type="button" data-del="${i}" aria-label="Delete">\u2715</button></td></tr>`;
+  }).join("")||`<tr><td class="muted" colspan="4">Nothing added yet.</td></tr>`;
 
+  // setup fields
   $("sBudget").value=S.budget;
-  $("billList").innerHTML=S.bills.map((b,i)=>`<div class="bill-row"><input aria-label="Bill name" data-bn="${i}" value="${esc(b.name)}"><input aria-label="Monthly amount" type="number" min="0" step="1" data-bm="${i}" value="${b.monthly}"><button class="ghost tiny" type="button" data-bd="${i}" aria-label="Remove bill">✕</button></div>`).join("");
+  $("pStart").value=S.period.start;
+  $("pDays").value=S.period.days;
+  $("pEnd").value=toISO(pEnd);
+  $("periodSummary").textContent=fmtRange(pStart,pEnd,S.period.days);
+  $("periodHint").innerHTML=`Enter only the money you have and the bills you must pay between <b>${fmtShort(pStart)}</b> and <b>${fmtShort(pEnd)}</b>.`;
+  $("billList").innerHTML=S.bills.map((b,i)=>`<div class="bill-row"><input aria-label="Bill name" data-bn="${i}" value="${esc(b.name)}"><input aria-label="Amount" type="number" min="0" step="1" data-bm="${i}" value="${b.amt}"><button class="ghost tiny" type="button" data-bd="${i}" aria-label="Remove bill">\u2715</button></div>`).join("");
   renderChart();
 }
 
@@ -356,11 +466,41 @@ function renderPreview(){
 function keepFocus(fn){const a=document.activeElement,ds=a?{...a.dataset}:{},id=a&&a.id;fn();
   if(id&&$(id))$(id).focus();else{const k=Object.keys(ds)[0];if(k){const el=document.querySelector(`[data-${k}="${ds[k]}"]`);if(el)el.focus()}}}
 
+/* ---- Period quick buttons ---- */
+$("pMonth").addEventListener("click",()=>{
+  const y=NOW.getFullYear(),m=NOW.getMonth();
+  S.period={start:toISO(new Date(y,m,1)),days:new Date(y,m+1,0).getDate()};
+  save();render();
+});
+$("p7").addEventListener("click",()=>{ S.period={start:TODAY_ISO,days:7};save();render() });
+$("p14").addEventListener("click",()=>{ S.period={start:TODAY_ISO,days:14};save();render() });
+$("p30").addEventListener("click",()=>{ S.period={start:TODAY_ISO,days:30};save();render() });
+
+/* ---- Input handling ---- */
 document.addEventListener("input",ev=>{
   const t=ev.target,n=v=>Math.max(0,+v||0);
   if(t.id==="amt"||t.id==="cat"){renderPreview();return}
+  if(t.id==="addDate")return;
+  if(t.id==="pStart"){
+    const d=t.value;
+    if(d){S.period.start=d; save();keepFocus(render)}
+    return;
+  }
+  if(t.id==="pDays"){
+    const v=Math.max(1,+t.value||1);
+    S.period.days=v; save();keepFocus(render);
+    return;
+  }
+  if(t.id==="pEnd"){
+    const d=t.value;
+    if(d){
+      const diff=daysBetween(parseISO(S.period.start),parseISO(d))+1;
+      if(diff>=1){S.period.days=diff; save();keepFocus(render)}
+    }
+    return;
+  }
   if(t.id==="sBudget")S.budget=n(t.value);
-  else if(t.dataset.bm!==undefined)S.bills[+t.dataset.bm].monthly=n(t.value);
+  else if(t.dataset.bm!==undefined)S.bills[+t.dataset.bm].amt=n(t.value);
   else if(t.dataset.bn!==undefined){const i=+t.dataset.bn,old=S.bills[i].name;S.bills[i].name=t.value;S.log.forEach(e=>{if(e.cat===old)e.cat=t.value})}
   else return;
   save();keepFocus(render);
@@ -370,55 +510,58 @@ document.addEventListener("click",ev=>{
   const t=ev.target.closest("button");if(!t)return;
   if(t.dataset.del!==undefined){S.log.splice(+t.dataset.del,1)}
   else if(t.dataset.bd!==undefined){S.bills.splice(+t.dataset.bd,1)}
-  else if(t.id==="addBill"){S.bills.push({name:"New bill",monthly:0})}
+  else if(t.id==="addBill"){S.bills.push({name:"New bill",amt:0})}
   else if(t.id==="resetBtn"){S=example()}
-  else if(t.id==="setupMyBtn"){S={budget:0,bills:[],log:[]};save();render();document.querySelector("details").open=true;$("sBudget").focus();return}
+  else if(t.id==="setupMyBtn"){S={budget:0,period:defaultPeriod(),bills:[],log:[]};save();render();document.querySelector("details").open=true;$("sBudget").focus();return}
+  else if(t.id==="newPeriodBtn"){S.period={start:TODAY_ISO,days:30};save();render();document.querySelector("details").open=true;$("pStart").focus();return}
   else if(t.id==="explainerBtn"){const b=$("explainerBody");b.hidden=!b.hidden;return}
   else return;
   save();render();
 });
 $("addForm").addEventListener("submit",ev=>{ev.preventDefault();
   const amt=+$("amt").value;if(!(amt>0))return;
-  S.log.push({date:dateOf(TODAY),desc:$("desc").value.trim()||$("cat").value,cat:$("cat").value,amt});
+  const date=$("addDate").value||TODAY_ISO;
+  S.log.push({date,desc:$("desc").value.trim()||$("cat").value,cat:$("cat").value,amt});
   $("amt").value="";$("desc").value="";save();render();});
 
-/* ---- Cumulative spending chart (SVG) ----
-   Two lines: "Spent so far" (cumulative daily-category spending) vs
-   "Plan so far" (planned_daily × day). Future days shown as dotted
-   projection at the current daily rate.                                */
+/* ---- Cumulative spending chart (SVG) ---- */
 function niceMax(v){
   if(v<=0)return 100;
   const step=v<=200?50:v<=500?100:v<=1000?200:v<=2000?500:500;
   return Math.ceil(v/step)*step;
 }
 function renderChart(){
+  const DAYS=periodDays();
+  const pStart=periodStart();
+  const pEnd=periodEnd();
   const billNames=new Set(S.bills.map(b=>b.name));
-  const dailyLog=monthLog().filter(e=>!billNames.has(e.cat));
+  const dailyLog=periodLog().filter(e=>!billNames.has(e.cat));
   const perDay=new Array(DAYS).fill(0);
-  dailyLog.forEach(e=>{const d=+e.date.slice(8);if(d>=1&&d<=DAYS)perDay[d-1]+=e.amt});
-  // cumulative actual spending (daily categories only)
+  dailyLog.forEach(e=>{const di=dayIndex(e.date);if(di>=0&&di<DAYS)perDay[di]+=e.amt});
+  // cumulative actual spending
   const cumActual=[];
   let runSum=0;
+  const ti=todayDayIndex();
+  const todayIdx=periodNotStarted()?-1:Math.min(Math.max(0,ti),DAYS-1);
   for(let i=0;i<DAYS;i++){runSum+=perDay[i];cumActual.push(runSum)}
-  const totalBills=S.bills.reduce((a,b)=>a+b.monthly,0);
+  const totalBills=S.bills.reduce((a,b)=>a+b.amt,0);
   const plannedDaily=Math.max(0,(S.budget-totalBills)/DAYS);
-  // cumulative plan line
   const cumPlan=[];
   for(let i=0;i<DAYS;i++) cumPlan.push(plannedDaily*(i+1));
   const c=compute();
-  // projection: from today at current daily rate
   const currentDaily=Math.max(0,c.daily);
+  const actualDays=periodNotStarted()?0:Math.min(todayIdx+1,DAYS);
   const cumProject=[];
-  for(let i=TODAY;i<DAYS;i++) cumProject.push(cumActual[TODAY-1]+currentDaily*(i-TODAY+1));
+  if(!periodHasEnded()&&actualDays<DAYS){
+    for(let i=actualDays;i<DAYS;i++) cumProject.push(cumActual[actualDays-1]+currentDaily*(i-actualDays+1));
+  }
 
-  const maxVal=Math.max(cumPlan[DAYS-1],cumActual[TODAY-1]+(cumProject.length?cumProject[cumProject.length-1]-cumActual[TODAY-1]:0),1);
+  const maxVal=Math.max(cumPlan[DAYS-1]||0,cumActual[actualDays-1]||0+(cumProject.length?cumProject[cumProject.length-1]-(cumActual[actualDays-1]||0):0),1);
   const ceilMax=niceMax(maxVal*1.1);
   const cs=getComputedStyle(document.documentElement);
   const accent=cs.getPropertyValue("--accent").trim();
   const muted=cs.getPropertyValue("--muted").trim();
   const linec=cs.getPropertyValue("--line").trim();
-  const ok=cs.getPropertyValue("--ok").trim();
-  const monName=NOW.toLocaleString("en-US",{month:"long"});
   const containerW=$("chartWrap").clientWidth||500;
   const LEFT=48,RIGHT=12,TOP=12,BOT=36;
   const W=containerW;
@@ -435,43 +578,44 @@ function renderChart(){
     svg+=`<line x1="${LEFT}" y1="${y}" x2="${W-RIGHT}" y2="${y}" stroke="${linec}" stroke-width="0.5"/>`;
     svg+=`<text x="${LEFT-6}" y="${y+4}" fill="${muted}" font-size="12" ${FONT} text-anchor="end">$${v}</text>`;
   }
-  // plan line (dashed, full month)
+  // plan line
   if(plannedDaily>0){
     let pts="";for(let i=0;i<DAYS;i++) pts+=(i?'L':'M')+`${cx(i)},${cy(cumPlan[i])}`;
     svg+=`<path d="${pts}" fill="none" stroke="${muted}" stroke-width="1.5" stroke-dasharray="5,3"/>`;
   }
-  // actual spent line (solid, up to today)
-  if(TODAY>=1){
-    let pts="";for(let i=0;i<TODAY;i++) pts+=(i?'L':'M')+`${cx(i)},${cy(cumActual[i])}`;
+  // actual spent line
+  if(actualDays>=1){
+    let pts="";for(let i=0;i<actualDays;i++) pts+=(i?'L':'M')+`${cx(i)},${cy(cumActual[i])}`;
     svg+=`<path d="${pts}" fill="none" stroke="${accent}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>`;
-    // dot on today
-    svg+=`<circle cx="${cx(TODAY-1)}" cy="${cy(cumActual[TODAY-1])}" r="4" fill="${accent}"/>`;
+    svg+=`<circle cx="${cx(actualDays-1)}" cy="${cy(cumActual[actualDays-1])}" r="4" fill="${accent}"/>`;
   }
-  // projection (dotted, from today to end of month)
-  if(cumProject.length>0&&TODAY<DAYS){
-    let pts=`M${cx(TODAY-1)},${cy(cumActual[TODAY-1])}`;
-    for(let i=0;i<cumProject.length;i++) pts+=`L${cx(TODAY+i)},${cy(cumProject[i])}`;
+  // projection
+  if(cumProject.length>0){
+    let pts=`M${cx(actualDays-1)},${cy(cumActual[actualDays-1])}`;
+    for(let i=0;i<cumProject.length;i++) pts+=`L${cx(actualDays+i)},${cy(cumProject[i])}`;
     svg+=`<path d="${pts}" fill="none" stroke="${accent}" stroke-width="1.5" stroke-dasharray="3,4" opacity="0.5"/>`;
   }
-  // x-axis day labels
-  const labelEvery=DAYS<=16?2:DAYS<=23?3:5;
+  // x-axis: real dates
+  const labelEvery=DAYS<=8?1:DAYS<=16?2:DAYS<=23?3:5;
   for(let i=0;i<DAYS;i++){
-    const d=i+1;
-    const isToday=d===TODAY;
-    const isRegular=(d%labelEvery===0)||d===1||d===DAYS;
-    if(!isToday&&isRegular&&Math.abs(d-TODAY)<=1)continue;
-    if(!isToday&&d!==DAYS&&isRegular&&DAYS-d<labelEvery)continue;
+    const d=addDays(pStart,i);
+    const isToday=toISO(d)===TODAY_ISO;
+    const isRegular=(i%labelEvery===0)||i===0||i===DAYS-1;
+    if(!isToday&&isRegular&&Math.abs(i-todayIdx)<=1)continue;
+    if(!isToday&&i!==DAYS-1&&isRegular&&DAYS-1-i<labelEvery)continue;
     const show=isToday||isRegular;
     if(show){
-      svg+=`<text x="${cx(i)}" y="${H-BOT+15}" fill="${isToday?accent:muted}" font-size="12" font-weight="${isToday?'600':'400'}" ${FONT} text-anchor="middle">${d}</text>`;
+      const lbl=fmtShort(d);
+      svg+=`<text x="${cx(i)}" y="${H-BOT+15}" fill="${isToday?accent:muted}" font-size="10" font-weight="${isToday?'600':'400'}" ${FONT} text-anchor="middle">${lbl}</text>`;
     }
   }
-  svg+=`<text x="${LEFT+plotW/2}" y="${H-4}" fill="${muted}" font-size="12" font-family="var(--f-body)" text-anchor="middle">Day of ${monName}</text>`;
-  // invisible hover zones for tooltip
+  svg+=`<text x="${LEFT+plotW/2}" y="${H-4}" fill="${muted}" font-size="12" font-family="var(--f-body)" text-anchor="middle">${fmtShort(pStart)} \u2013 ${fmtShort(pEnd)}</text>`;
+  // hover zones
   const stepW=plotW/DAYS;
   for(let i=0;i<DAYS;i++){
-    const val=i<TODAY?cumActual[i]:(i===TODAY-1?cumActual[i]:0);
-    svg+=`<rect class="chart-bar" data-day="${i+1}" data-amt="${Math.round(val)}" x="${cx(i)-stepW/2}" y="${TOP}" width="${stepW}" height="${plotH}" fill="transparent"/>`;
+    const val=i<actualDays?cumActual[i]:0;
+    const d=addDays(pStart,i);
+    svg+=`<rect class="chart-bar" data-idx="${i}" data-date="${fmtShort(d)}" data-amt="${Math.round(val)}" x="${cx(i)-stepW/2}" y="${TOP}" width="${stepW}" height="${plotH}" fill="transparent"/>`;
   }
   svg+=`</svg>`;
   $("chartWrap").innerHTML=svg;
@@ -481,28 +625,29 @@ function renderChart(){
     `<span><i style="background:${accent};opacity:0.5;height:2px;width:14px;border-radius:0;border-top:1px dashed ${accent}"></i>Projection</span>`+
     `<span><i style="background:${muted};height:2px;width:14px;border-radius:0;border-top:1px dashed ${muted}"></i>Plan: ${money(plannedDaily)}/day</span>`;
   // note
-  const spentSoFar=cumActual[TODAY-1]||0;
-  const planSoFar=plannedDaily*TODAY;
+  const spentSoFar=cumActual[actualDays-1]||0;
+  const planSoFar=plannedDaily*actualDays;
   const diff=spentSoFar-planSoFar;
-  if(plannedDaily>0){
+  if(plannedDaily>0&&actualDays>0){
     $("chartNote").innerHTML=diff<=0
-      ?`You've spent ${money(spentSoFar)} of a planned ${money(planSoFar)} by day ${TODAY} — ${money(-diff)} under plan.`
-      :`You've spent ${money(spentSoFar)} of a planned ${money(planSoFar)} by day ${TODAY} — ${money(diff)} over plan.`;
+      ?`You've spent ${money(spentSoFar)} of a planned ${money(planSoFar)} by day ${actualDays} \u2014 ${money(-diff)} under plan.`
+      :`You've spent ${money(spentSoFar)} of a planned ${money(planSoFar)} by day ${actualDays} \u2014 ${money(diff)} over plan.`;
   } else {
     $("chartNote").textContent="";
   }
-  // tooltip on hover/tap
+  // tooltip
   const wrap=$("chartWrap").parentElement;
   const tip=$("chartTip");
   wrap.addEventListener("pointermove",ev=>{
     const bar=ev.target.closest(".chart-bar");
     if(!bar){tip.classList.remove("show");return}
-    const d=+bar.dataset.day;
-    if(d>TODAY){tip.textContent=`Day ${d} (future)`;tip.classList.add("show")}
+    const idx=+bar.dataset.idx;
+    const dateLabel=bar.dataset.date;
+    if(idx>=actualDays){tip.textContent=`${dateLabel} (future)`;tip.classList.add("show")}
     else{
-      const actual=cumActual[d-1];
-      const plan=Math.round(plannedDaily*d);
-      tip.textContent=`Day ${d}: ${money(actual)} spent (plan: ${money(plan)})`;
+      const actual=cumActual[idx];
+      const plan=Math.round(plannedDaily*(idx+1));
+      tip.textContent=`${dateLabel}: ${money(actual)} spent (plan: ${money(plan)})`;
       tip.classList.add("show");
     }
     const rect=wrap.getBoundingClientRect();
@@ -514,10 +659,11 @@ function renderChart(){
 
 /* ---- CSV Export ---- */
 function exportCSV(){
-  const log=monthLog().slice().sort((a,b)=>a.date.localeCompare(b.date));
+  const log=periodLog().slice().sort((a,b)=>a.date.localeCompare(b.date));
   const lines=[];
   lines.push("# Budget: "+S.budget);
-  S.bills.forEach(b=>lines.push("# Bill: "+b.name+", "+b.monthly));
+  lines.push("# Period: "+S.period.start+", "+S.period.days+" days");
+  S.bills.forEach(b=>lines.push("# Bill: "+b.name+", "+b.amt));
   lines.push("date,description,category,amount");
   log.forEach(e=>{
     const desc=e.desc.includes(",")?'"'+e.desc.replace(/"/g,'""')+'"':e.desc;
@@ -527,7 +673,7 @@ function exportCSV(){
   const blob=new Blob([lines.join("\n")],{type:"text/csv"});
   const a=document.createElement("a");
   a.href=URL.createObjectURL(blob);
-  a.download="spend-plan-"+MONTH_KEY+".csv";
+  a.download="spend-plan-"+S.period.start+".csv";
   a.click();
   URL.revokeObjectURL(a.href);
 }
@@ -536,18 +682,25 @@ function exportCSV(){
 function importCSV(text){
   const lines=text.split(/\r?\n/).filter(l=>l.trim());
   let budget=S.budget;
+  let period=S.period;
   const bills=[];
   const log=[];
   for(const raw of lines){
     if(raw.startsWith("# Budget: ")){budget=+raw.slice(10)||budget;continue}
+    if(raw.startsWith("# Period: ")){
+      const parts=raw.slice(10).split(",");
+      if(parts.length>=2){
+        period={start:parts[0].trim(),days:+parts[1].trim()||30};
+      }
+      continue;
+    }
     if(raw.startsWith("# Bill: ")){
       const parts=raw.slice(8);
       const lastComma=parts.lastIndexOf(",");
-      if(lastComma>0){bills.push({name:parts.slice(0,lastComma).trim(),monthly:+parts.slice(lastComma+1).trim()||0})}
+      if(lastComma>0){bills.push({name:parts.slice(0,lastComma).trim(),amt:+parts.slice(lastComma+1).trim()||0})}
       continue;
     }
     if(raw.toLowerCase().startsWith("date,"))continue;
-    // parse CSV row (handle quoted fields)
     const fields=[];let cur="",inQ=false;
     for(let i=0;i<raw.length;i++){
       const ch=raw[i];
@@ -561,10 +714,14 @@ function importCSV(text){
     }
   }
   S.budget=budget;
+  S.period=period;
   if(bills.length)S.bills=bills;
-  // merge: replace entries for months in the import, keep others
-  const importMonths=new Set(log.map(e=>e.date.slice(0,7)));
-  S.log=S.log.filter(e=>!importMonths.has(e.date.slice(0,7))).concat(log);
+  const importDates=new Set(log.map(e=>e.date));
+  if(importDates.size>0){
+    const minD=[...importDates].sort()[0];
+    const maxD=[...importDates].sort().pop();
+    S.log=S.log.filter(e=>e.date<minD||e.date>maxD).concat(log);
+  }
   save();render();
 }
 
